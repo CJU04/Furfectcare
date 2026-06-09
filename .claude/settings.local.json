@@ -21,7 +21,26 @@
       "Bash(flutter analyze lib/screens/dashboard/admin/admin_dashboard_screen.dart)",
       "Bash(flutter analyze lib/views/screens/user_management_screen.dart lib/views/screens/appointment_management_screen.dart)",
       "Bash(flutter analyze lib/screens/auth/login_screen.dart)",
-      "Bash(flutter pub run flutter_launcher_icons)"
+      "Bash(flutter pub run flutter_launcher_icons)",
+      "Bash(git checkout -- lib/screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart)",
+      "Bash(flutter analyze lib/screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart)",
+      "Bash(git checkout HEAD -- lib/screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart)",
+      "Bash(flutter analyze lib/services/firestore_database_service.dart)",
+      "Bash(flutter analyze lib/views/screens/appointment_management_screen.dart lib/providers/appointment_provider.dart lib/services/firestore_database_service.dart)",
+      "Read(//c/Users/Tsayter/Desktop/PROJECT_Silva/furpectcare_fixed/**)",
+      "Bash(flutter analyze lib/views/screens/product_catalog_screen.dart)",
+      "Bash(flutter analyze lib/screens/dashboard/pet_owner/pet_owner_dashboard_screen.dart lib/screens/dashboard/staff/staff_dashboard_screen.dart lib/screens/dashboard/admin/admin_dashboard_screen.dart)",
+      "Bash(flutter --version)",
+      "Bash(flutter doctor)",
+      "Bash(python3:*)",
+      "Bash(flutter analyze lib/screens/dashboard/admin/admin_dashboard_screen.dart lib/screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart lib/views/screens/appointment_management_screen.dart)",
+      "Bash(flutter analyze --no-fatal-infos)",
+      "Bash(flutter analyze lib/routes/app_router.dart)",
+      "Bash(flutter analyze lib/screens/dashboard/customer/customer_dashboard_screen.dart)",
+      "Bash(flutter analyze lib/screens/dashboard/staff/staff_dashboard_screen.dart)",
+      "Bash(flutter analyze lib/routes/app_router.dart lib/screens/dashboard/customer/customer_dashboard_screen.dart lib/screens/dashboard/staff/staff_dashboard_screen.dart lib/screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart)",
+      "Bash(flutter analyze lib/views/screens/sales_pos_screen.dart lib/views/screens/appointment_management_screen.dart)",
+      "Bash(flutter analyze lib/views/screens/sales_pos_screen.dart lib/views/widgets/drawer_widget.dart lib/screens/dashboard/customer/customer_dashboard_screen.dart)"
     ]
   }
 }

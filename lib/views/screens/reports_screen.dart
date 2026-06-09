@@ -159,7 +159,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                     Text(
-                      '₱${totalSales.toStringAsFixed(2)}',
+'💰${totalSales.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -255,7 +255,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                         DataCell(Text(timeDisplay)),
                         DataCell(
                           Text(
-                            '₱${sale.totalAmount.toStringAsFixed(2)}',
+'💰${sale.totalAmount.toStringAsFixed(2)}',
                             style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
                         ),
@@ -445,7 +445,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                       ),
                       DataCell(
                         Text(
-                          '₱${product.price.toStringAsFixed(2)}',
+'💰${product.price.toStringAsFixed(2)}',
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
                       ),
@@ -677,7 +677,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '₱${revenue.toStringAsFixed(2)}',
+'💰${revenue.toStringAsFixed(2)}',
                               style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -774,7 +774,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Total Amount: ₱${sale.totalAmount.toStringAsFixed(2)}',
+'Total Amount: 💰${sale.totalAmount.toStringAsFixed(2)}',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],

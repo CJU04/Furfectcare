@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+
 import 'package:vetcare_connect/config/theme/app_theme.dart';
 import 'package:vetcare_connect/models/appointment.dart';
 import 'package:vetcare_connect/models/medical_history.dart';
@@ -85,7 +86,8 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
               controller: _searchController,
               decoration: InputDecoration(
                 labelText: 'Search',
-                hintText: 'Search by reason/status...',
+                hintText: 'Search appointments (reason or status)',
+                prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear),
@@ -94,6 +96,7 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
                         },
                       )
                     : null,
+                border: const OutlineInputBorder(),
               ),
             ),
           ),
@@ -186,16 +189,52 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
     return '${pet.age} years';
   }
 
+  bool _hasOverlap({
+    required String date,
+    required String time,
+    required String ownerUid,
+    required String? petId,
+    required List<Appointment> allAppointments,
+    String? excludeAppointmentId,
+  }) {
+    try {
+      final newTimeMinutes = _timeToMinutes(time);
+      if (newTimeMinutes == null) return false;
+
+      for (final appt in allAppointments) {
+        if (excludeAppointmentId != null && appt.appointmentId == excludeAppointmentId) continue;
+        if (appt.ownerUid != ownerUid) continue;
+        if (date != appt.date) continue;
+
+        final existingTimeMinutes = _timeToMinutes(appt.time);
+        if (existingTimeMinutes == null) continue;
+
+        final diff = (newTimeMinutes - existingTimeMinutes).abs();
+        if (diff < 60) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  int? _timeToMinutes(String? timeStr) {
+    if (timeStr == null || timeStr.isEmpty) return null;
+    try {
+      final parts = timeStr.split(':');
+      if (parts.length < 2) return null;
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      return hour * 60 + minute;
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _showAppointmentDialog({
     required AppointmentProvider appointmentProvider,
     required PetProvider petProvider,
     required MedicalHistoryProvider medicalHistoryProvider,
     Appointment? appointment,
   }) {
-    // NOTE: appointment.appointmentId MUST be non-null for edit/delete.
-    // This screen previously created new Appointment instances without ensuring that
-    // editing/deleting uses the appointmentId returned by the database.
-
     final formKey = GlobalKey<FormState>();
     final authProvider = context.read<AuthProvider>();
     final uid = authProvider.firebaseUser?.uid;
@@ -207,30 +246,26 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
     final reasonController = TextEditingController(text: appointment?.reason ?? '');
     final dateController = TextEditingController(text: appointment?.date ?? '');
     final timeController = TextEditingController(text: appointment?.time ?? '');
-    final petNameController = TextEditingController();
     final petDescriptionController = TextEditingController();
     final medicalHistoryController = TextEditingController();
 
-    // For this simplified screen:
-    // - customer books for their own pets => ownerUid == uid
-    // - pet selection is based on ownerUid
     final String ownerUid = appointment?.ownerUid ?? uid;
-
     List<Pet> availablePets = petProvider.pets.where((p) => p.ownerUid == ownerUid).toList();
 
     Pet? selectedPet;
-    if (appointment != null) {
+
+    if (appointment == null) {
+      selectedPet = availablePets.isNotEmpty ? availablePets.first : null;
+    } else {
       selectedPet = availablePets.where((p) => p.petId == appointment.petId).isNotEmpty
           ? availablePets.firstWhere((p) => p.petId == appointment.petId)
           : null;
-
       if (selectedPet != null) {
-        petNameController.text = selectedPet.name;
+        petDescriptionController.text = selectedPet.name;
       }
     }
 
     String status = appointment?.status ?? 'scheduled';
-    String? assignedUserId = appointment?.assignedUserId;
 
     List<MedicalHistory> selectedPetHistories = [];
 
@@ -241,32 +276,22 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
         selectedPetHistories = [];
         return;
       }
-
-      // Build readable pet info - each field on its own line for clarity
-      petDescriptionController.text = 'Type: ${pet.type}\n'
-          'Breed: ${pet.breed}\n'
-          'Age: ${pet.age} years\n'
-          'Gender: ${pet.gender}\n'
-          'Vaccination Status: ${pet.vaccinationStatus}\n'
-          'Health Notes: ${pet.healthNotes}';
-
+      petDescriptionController.text = 'Type: ${pet.type}, Breed: ${pet.breed}, Age: ${pet.age}y';
       selectedPetHistories = medicalHistoryProvider.medicalHistories
           .where((h) => h.petId == pet.petId)
           .toList();
-
       if (selectedPetHistories.isNotEmpty) {
         medicalHistoryController.text = selectedPetHistories
-            .map((h) =>
-                'Date: ${h.date}\nDiagnosis: ${h.diagnosis}\nTreatment: ${h.treatment}\nNotes: ${h.notes}')
-            .join('\n\n');
+            .take(2)
+            .map((h) => '${h.date}: ${h.diagnosis}')
+            .join(' | ');
       } else {
-        medicalHistoryController.text = 'No medical history available';
+        medicalHistoryController.text = 'No medical history';
       }
     }
 
     populatePetDetails(selectedPet);
 
-    // If no pets available for new appointment, show message and abort
     if (availablePets.isEmpty && appointment == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -281,9 +306,9 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (dialogContext, setState) {
             return AlertDialog(
               title: Text(appointment == null ? 'Book Appointment' : 'Edit Appointment'),
               content: SizedBox(
@@ -292,311 +317,201 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
                   key: formKey,
                   child: SingleChildScrollView(
                     child: Column(
-                      // Prevent dialog content from forcing an overflow when screen is short.
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: DropdownButtonFormField<Pet>(
-                              decoration: const InputDecoration(
-                                labelText: 'Select Pet',
-                                border: OutlineInputBorder(),
-                              ),
-                              value: selectedPet,
-                              isExpanded: true,
-                              items: availablePets.map((pet) {
-                                return DropdownMenuItem<Pet>(
-                                  value: pet,
-                                  child: Text(pet.name),
-                                );
-                              }).toList(),
-                              onChanged: (Pet? pet) {
-                                setState(() {
-                                  selectedPet = pet;
-                                  if (pet != null) {
-                                    petNameController.text = pet.name;
-                                  }
-                                  populatePetDetails(pet);
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null) {
-                                  return 'Please select a pet';
-                                }
-                                return null;
-                              },
+                      DropdownButtonFormField<Pet>(
+                        decoration: const InputDecoration(
+                          labelText: 'Select Pet',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        value: selectedPet,
+                        isExpanded: true,
+                        items: availablePets.map((pet) {
+                          return DropdownMenuItem<Pet>(
+                            value: pet,
+                            child: Text(pet.name, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (Pet? pet) {
+                          setState(() {
+                            selectedPet = pet;
+                            if (pet != null) {
+                              petDescriptionController.text = pet.name;
+                            }
+                            populatePetDetails(pet);
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) return 'Please select a pet';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      ExpansionTile(
+                        title: const Text('Pet Info', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: EdgeInsets.zero,
+                        children: [
+                          Text(
+                            petDescriptionController.text.isEmpty ? '-' : petDescriptionController.text,
+                            style: const TextStyle(fontSize: 11, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: medicalHistoryController,
+                        decoration: const InputDecoration(
+                          labelText: 'Medical History',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        maxLines: 1,
+                        enabled: false,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () async {
+                          final pickedDate = await showDatePicker(
+                            context: dialogContext,
+                            initialDate: (dateController.text.trim().isNotEmpty)
+                                ? DateTime.tryParse(dateController.text.trim()) ?? DateTime.now()
+                                : DateTime.now(),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (pickedDate != null) {
+                            dateController.text = DateFormat('yyyy-MM-dd').format(pickedDate);
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Date',
+                            border: OutlineInputBorder(),
+                            suffixIcon: Icon(Icons.calendar_today, size: 18),
+                            isDense: true,
+                          ),
+                          child: Text(
+                            dateController.text.isEmpty ? 'Select Date' : dateController.text,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: dateController.text.isEmpty ? Colors.grey : Colors.black,
                             ),
                           ),
                         ),
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          color: Colors.grey.shade50,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Pet Information',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildReadOnlyField('Type', selectedPet?.type ?? '-'),
-                                _buildReadOnlyField('Breed', selectedPet?.breed ?? '-'),
-                                _buildReadOnlyField('Age', _getPetAge(selectedPet)),
-                                _buildReadOnlyField('Gender', selectedPet?.gender ?? '-'),
-                                _buildReadOnlyField('Vaccination Status', selectedPet?.vaccinationStatus ?? '-'),
-                                _buildReadOnlyField('Health Notes', selectedPet?.healthNotes ?? '-'),
-                              ],
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () async {
+                          final time = await showTimePicker(
+                            context: dialogContext,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (time != null) {
+                            timeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00';
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Time',
+                            border: OutlineInputBorder(),
+                            suffixIcon: Icon(Icons.access_time, size: 18),
+                            isDense: true,
+                          ),
+                          child: Text(
+                            timeController.text.isEmpty ? 'Select Time' : timeController.text,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: timeController.text.isEmpty ? Colors.grey : Colors.black,
                             ),
                           ),
                         ),
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: TextFormField(
-                              controller: medicalHistoryController,
-                              decoration: const InputDecoration(
-                                labelText: 'Medical History',
-                                border: OutlineInputBorder(),
-                              ),
-                              minLines: 3,
-                              maxLines: 3,
-                              enabled: false,
-                            ),
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: reasonController,
+                        decoration: const InputDecoration(
+                          labelText: 'Reason',
+                          border: OutlineInputBorder(),
+                          isDense: true,
                         ),
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: InkWell(
-                              onTap: () async {
-                                final date = await showDatePicker(
-                                  context: context,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime.now(),
-                                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                                );
-                                if (date != null) {
-                                  dateController.text = DateFormat('yyyy-MM-dd').format(date);
-                                }
-                              },
-                              child: InputDecorator(
-                                decoration: InputDecoration(
-                                  labelText: 'Date',
-                                  border: const OutlineInputBorder(),
-                                  suffixIcon: const Icon(Icons.calendar_today),
-                                  errorText: dateController.text.isEmpty && formKey.currentState!.validate() == false && reasonController.text.isNotEmpty
-                                      ? null
-                                      : null,
-                                ),
-                                child: Text(
-                                  dateController.text.isEmpty ? 'Select Date' : dateController.text,
-                                  style: TextStyle(
-                                    color: dateController.text.isEmpty ? Colors.grey : Colors.black,
-                                  ),
-                                ),
-                              ),
-                            ),
+                        maxLines: 1,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please describe the reason for your visit';
+                          }
+                          if (value.trim().length < 3) {
+                            return 'Reason must be at least 3 characters long';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      if (role != 'customer' || appointment != null)
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'Status',
+                            border: OutlineInputBorder(),
+                            isDense: true,
                           ),
+                          value: status,
+                          items: const [
+                            DropdownMenuItem(value: 'scheduled', child: Text('Scheduled')),
+                            DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                            DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                          ],
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setState(() {
+                              status = v;
+                            });
+                          },
                         ),
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: InkWell(
-                              onTap: () async {
-                                final time = await showTimePicker(
-                                  context: context,
-                                  initialTime: TimeOfDay.now(),
-                                );
-                                if (time != null) {
-                                  timeController.text = '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00';
-                                }
-                              },
-                              child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  labelText: 'Time',
-                                  border: OutlineInputBorder(),
-                                  suffixIcon: Icon(Icons.access_time),
-                                ),
-                                child: Text(
-                                  timeController.text.isEmpty ? 'Select Time' : timeController.text,
-                                  style: TextStyle(
-                                    color: timeController.text.isEmpty ? Colors.grey : Colors.black,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Card(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: TextFormField(
-                              controller: reasonController,
-                              decoration: const InputDecoration(
-                                labelText: 'Reason',
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please describe the reason for your visit';
-                                }
-                                if (value.trim().length < 3) {
-                                  return 'Reason must be at least 3 characters long';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ),
-
-                        // Only allow updating status for non-customers (optional)
-                        if (role != 'customer' || appointment != null)
-                          Card(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: DropdownButtonFormField<String>(
-                                decoration: const InputDecoration(
-                                  labelText: 'Status',
-                                  border: OutlineInputBorder(),
-                                ),
-                                value: status,
-                                items: const [
-                                  DropdownMenuItem(value: 'scheduled', child: Text('Scheduled')),
-                                  DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                                  DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-                                ],
-                                onChanged: (v) {
-                                  if (v == null) return;
-                                  setState(() {
-                                    status = v;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                      const SizedBox(height: 8),
+                    ],
                   ),
                 ),
               ),
-              actions: [
+            ),
+            actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogContext),
                   child: const Text('Cancel'),
                 ),
                 TextButton(
-                  onPressed: () async {
+                  onPressed: () {
                     if (!formKey.currentState!.validate()) return;
 
-                    // Validate date and time are selected
-                    if (dateController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select a date for the appointment.')),
-                      );
-                      return;
-                    }
-                    if (timeController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select a time for the appointment.')),
-                      );
-                      return;
-                    }
+                    final selectedDate = dateController.text.trim();
+                    final selectedTime = timeController.text.trim();
 
-                    final navigator = Navigator.of(context);
-
-                    if (selectedPet == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select a pet from the dropdown list above to continue.')),
+                    if (selectedDate.isNotEmpty && selectedTime.isNotEmpty) {
+                      final hasConflict = _hasOverlap(
+                        date: selectedDate,
+                        time: selectedTime,
+                        ownerUid: ownerUid,
+                        petId: selectedPet?.petId,
+                        allAppointments: appointmentProvider.appointments,
+                        excludeAppointmentId: appointment?.appointmentId,
                       );
-                      return;
-                    }
 
-                    final newAppointment = Appointment(
-                      appointmentId: appointment?.appointmentId,
-                      petId: selectedPet!.petId!,
-                      ownerUid: ownerUid,
-                      assignedUserId: assignedUserId,
-                      date: dateController.text.trim(),
-                      time: timeController.text.trim(),
-                      reason: reasonController.text.trim(),
-                      status: status,
-                    );
-
-                    if (appointment == null) {
-                      navigator.pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Booking appointment...'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                      try {
-                        await appointmentProvider.addAppointment(newAppointment);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Appointment booked successfully'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to book appointment'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
+                      if (hasConflict) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You already have an appointment at this time. Please choose a different time.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
                       }
-                      return;
-                    } else {
-                      navigator.pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Updating appointment...'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                      try {
-                        await appointmentProvider.updateAppointment(newAppointment);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Appointment updated successfully'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to update appointment'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                      return;
                     }
+
+                    Navigator.pop(dialogContext);
                   },
-                  child: Text(appointment == null ? 'Book' : 'Update'),
+                  child: const Text('Save'),
                 ),
               ],
             );
@@ -620,25 +535,38 @@ class _AppointmentManagementScreenState extends State<AppointmentManagementScree
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(context).showSnackBar(
+              ScaffoldMessenger.of(dialogContext).showSnackBar(
                 const SnackBar(
                   content: Text('Deleting appointment...'),
                   duration: Duration(seconds: 1),
                 ),
               );
               try {
-                await appointmentProvider.deleteAppointment(appointment.appointmentId!);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                final id = appointment.appointmentId;
+                if (id == null) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      const SnackBar(
+                        content: Text('Cannot delete: appointmentId missing'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                await appointmentProvider.deleteAppointment(id);
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
                       content: Text('Appointment deleted successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );
                 }
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Text('Failed to delete appointment. Please try again.'),
                       backgroundColor: Colors.red,

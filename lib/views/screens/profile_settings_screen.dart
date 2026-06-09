@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io' as io;
 
 import 'package:path/path.dart' as path;
@@ -173,41 +174,46 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                       children: [
                         const SizedBox(height: 16),
                         Center(
-                child: Stack(
-                  children: [
-                  CircleAvatar(
-                    key: ValueKey(_profileImage?.path),
-                    radius: 50,
-                    backgroundImage:
-                        _profileImage != null ? FileImage(_profileImage!) : null,
-
-backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
-                    child: _profileImage == null ? Text(
-                      // Guard against empty names to avoid RangeError.
-                      (displayName?.trim().isNotEmpty == true)
-                          ? displayName!.trim()[0].toUpperCase()
-                          : 'U',
-
-                      style: const TextStyle(fontSize: 40, color: AppTheme.primaryGreen),
-                    ) : null,
-                  ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Theme.of(context).colorScheme.secondary,
-                        child: IconButton(
-                          icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
-                          onPressed: _pickImage,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
+                          child: SizedBox(
+                            width: 96,
+                            height: 96,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CircleAvatar(
+                                  key: ValueKey(_profileImage?.path),
+                                  radius: 44,
+                                  backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                                  backgroundImage: _getProfileImage(),
+                                  child: _profileImage == null &&
+                                      (currentUser?.photoUrl == null || currentUser!.photoUrl!.isEmpty) &&
+                                      (currentUser?.imageUrl == null || currentUser!.imageUrl!.isEmpty)
+                                      ? Text(
+                                          (displayName?.trim().isNotEmpty == true)
+                                              ? displayName!.trim()[0].toUpperCase()
+                                              : 'U',
+                                          style: const TextStyle(fontSize: 36, color: AppTheme.primaryGreen, fontWeight: FontWeight.bold),
+                                        )
+                                      : null,
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+                                      onPressed: _pickImage,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _fullnameController,
@@ -303,6 +309,21 @@ backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
         },
       ),
     );
+  }
+
+  ImageProvider? _getProfileImage() {
+    final firebaseUserProvider = Provider.of<FirebaseUserProvider>(context, listen: false);
+    final currentUser = firebaseUserProvider.currentUser;
+    if (_profileImage != null) {
+      return FileImage(_profileImage!);
+    }
+    if (currentUser?.photoUrl != null && currentUser!.photoUrl!.isNotEmpty) {
+      return CachedNetworkImageProvider(currentUser!.photoUrl!);
+    }
+    if (currentUser?.imageUrl != null && currentUser!.imageUrl!.isNotEmpty) {
+      return CachedNetworkImageProvider(currentUser!.imageUrl!);
+    }
+    return null;
   }
 
   Future<void> _pickImage() async {

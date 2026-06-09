@@ -458,6 +458,7 @@ class _CartSheet extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             margin: const EdgeInsets.only(top: 8),
@@ -475,10 +476,11 @@ class _CartSheet extends StatelessWidget {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
           ),
-          Expanded(
+          Flexible(
             child: ListView.builder(
               controller: scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16),
+              shrinkWrap: true,
               itemCount: cart.length,
               itemBuilder: (context, index) {
                 final item = cart[index];
@@ -524,6 +526,7 @@ class _CartSheet extends StatelessWidget {
             ),
             child: SafeArea(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

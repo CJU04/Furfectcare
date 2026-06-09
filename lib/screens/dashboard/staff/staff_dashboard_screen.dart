@@ -30,6 +30,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   }
 
   void _loadData() {
+    Provider.of<FirebaseUserProvider>(context, listen: false).loadUsers();
     Provider.of<AppointmentProvider>(context, listen: false).loadAppointments();
     Provider.of<PetProvider>(context, listen: false).loadPets();
   }
@@ -53,6 +54,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final firebaseUserProvider = Provider.of<FirebaseUserProvider>(context);
     final currentUser = firebaseUserProvider.currentUser;
     final appointmentProvider = Provider.of<AppointmentProvider>(context);
+    final petProvider = Provider.of<PetProvider>(context);
 
     // Get today's appointments
     final todayStr = DateTime.now().toString().split(' ')[0];
@@ -63,6 +65,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final pendingCount = appointmentProvider.appointments
         .where((appt) => appt.status == 'pending')
         .length;
+
+    final totalPets = petProvider.pets.length;
+    final totalAppointments = appointmentProvider.appointments.length;
 
     return Scaffold(
       appBar: AppBar(
@@ -76,7 +81,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         builder: (context, constraints) {
           final isWide = constraints.maxWidth > 600;
           final maxWidth = isWide ? 1000.0 : double.infinity;
-          final statCardWidth = isWide ? null : constraints.maxWidth;
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Center(
@@ -118,68 +122,39 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Quick Stats
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
+                    // Quick Stats - 2 columns grid
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.3,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
                       children: [
-                        if (statCardWidth != null)
-                          SizedBox(
-                            width: (statCardWidth - 24) / 3,
-                            child: _buildStatCard(
-                              'Today\'s Appointments',
-                              todayAppointments.length.toString(),
-                              Icons.calendar_today,
-                              Colors.blue,
-                            ),
-                          )
-                        else
-                          Expanded(
-                            child: _buildStatCard(
-                              'Today\'s Appointments',
-                              todayAppointments.length.toString(),
-                              Icons.calendar_today,
-                              Colors.blue,
-                            ),
-                          ),
-                        if (statCardWidth != null)
-                          SizedBox(
-                            width: (statCardWidth - 24) / 3,
-                            child: _buildStatCard(
-                              'Pending',
-                              pendingCount.toString(),
-                              Icons.pending_actions,
-                              Colors.orange,
-                            ),
-                          )
-                        else
-                          Expanded(
-                            child: _buildStatCard(
-                              'Pending',
-                              pendingCount.toString(),
-                              Icons.pending_actions,
-                              Colors.orange,
-                            ),
-                          ),
-                        if (statCardWidth != null)
-                          SizedBox(
-                            width: (statCardWidth - 24) / 3,
-                            child: _buildStatCard(
-                              'Total Pets',
-                              Provider.of<PetProvider>(context).pets.length.toString(),
-                              Icons.pets,
-                              Colors.green,
-                            ),
-                          )
-                        else
-                          Expanded(
-                            child: _buildStatCard(
-                              'Total Pets',
-                              Provider.of<PetProvider>(context).pets.length.toString(),
-                              Icons.pets,
-                              Colors.green,
-                            ),
-                          ),
+                        _buildStatCard(
+                          'Today\'s Appointments',
+                          todayAppointments.length.toString(),
+                          Icons.calendar_today,
+                          Colors.blue,
+                        ),
+                        _buildStatCard(
+                          'Pending',
+                          pendingCount.toString(),
+                          Icons.pending_actions,
+                          Colors.orange,
+                        ),
+                        _buildStatCard(
+                          'Total Pets',
+                          totalPets.toString(),
+                          Icons.pets,
+                          Colors.green,
+                        ),
+                        _buildStatCard(
+                          'Total Appointments',
+                          totalAppointments.toString(),
+                          Icons.event,
+                          Colors.teal,
+                        ),
                       ],
                     ),
 
@@ -236,101 +211,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Today's Appointments
-                    Row(
-                      children: [
-                        const Icon(Icons.schedule, color: AppTheme.primaryGreen),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Today\'s Appointments',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    if (todayAppointments.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(32.0),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        child: const Column(
-                          children: [
-                            Icon(Icons.event_available, size: 48, color: Colors.grey),
-                            SizedBox(height: 12),
-                            Text(
-                              'No appointments scheduled for today',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: todayAppointments.length,
-                        itemBuilder: (context, index) {
-                          final appointment = todayAppointments[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12.0),
-                            child: ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: const Icon(Icons.event, color: AppTheme.primaryGreen),
-                              ),
-                              title: Text(
-                                appointment.reason,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Pet ID: ${appointment.petId}'),
-                                  Text('Time: ${appointment.time}'),
-                                ],
-                              ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _getStatusColor(appointment.status).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20.0),
-                                ),
-                                child: Text(
-                                  appointment.status.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: _getStatusColor(appointment.status),
-                                  ),
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.pushNamed(context, '/appointment_management');
-                              },
-                            ),
-                          );
-                        },
-                      ),
 
                     const SizedBox(height: 24),
 
@@ -399,42 +279,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                                   'Appointments for ${_selectedDay != null ? DateFormat('MMMM d, yyyy').format(_selectedDay!) : 'Today'}',
                                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                                 ),
-                                const SizedBox(height: 8),
-                                Builder(
-                                  builder: (context) {
-                                    final dayAppointments = _selectedDay != null
-                                        ? _getAppointmentsForDay(_selectedDay!, appointmentProvider.appointments)
-                                        : <Appointment>[];
-                                    if (dayAppointments.isEmpty) {
-                                      return const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 8.0),
-                                        child: Text(
-                                          'No appointments for this day',
-                                          style: TextStyle(color: Colors.grey),
-                                        ),
-                                      );
-                                    }
-                                    return Column(
-                                      children: dayAppointments.map((appointment) {
-                                        return ListTile(
-                                          leading: const Icon(Icons.calendar_today, color: AppTheme.primaryGreen),
-                                          title: Text(appointment.reason),
-                                          subtitle: Text('Time: ${appointment.time}'),
-                                          trailing: Chip(
-                                            label: Text(
-                                              appointment.status,
-                                              style: const TextStyle(fontSize: 12),
-                                            ),
-                                            backgroundColor: Colors.grey.shade200,
-                                          ),
-                                          onTap: () {
-                                            Navigator.pushNamed(context, '/appointment_management');
-                                          },
-                                        );
-                                      }).toList(),
-                                    );
-                                  },
-                                ),
+                                const SizedBox(height: 12),
+                                _buildTimeSlotGrid(context, _selectedDay, appointmentProvider.appointments),
                               ],
                             ),
                           ),
@@ -451,33 +297,251 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     );
   }
 
+  Widget _buildTimeSlotGrid(BuildContext context, DateTime? selectedDay, List<Appointment> appointments) {
+    final dayAppointments = selectedDay != null
+        ? _getAppointmentsForDay(selectedDay, appointments)
+        : <Appointment>[];
+
+    final timeSlots = [
+      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
+      '4:00 PM', '5:00 PM', '6:00 PM',
+    ];
+
+    final occupiedSlots = <String, Appointment>{};
+    for (var apt in dayAppointments) {
+      final timeKey = _normalizeTime(apt.time);
+      if (timeKey != null) {
+        occupiedSlots[timeKey] = apt;
+      }
+    }
+
+    return SizedBox(
+      height: 220,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 2.5,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: timeSlots.length,
+        itemBuilder: (context, index) {
+          final slot = timeSlots[index];
+          final appointment = occupiedSlots[slot];
+          final isOccupied = appointment != null;
+
+          return InkWell(
+            onTap: () {
+              if (isOccupied) {
+                _showAppointmentDetails(context, appointment);
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isOccupied
+                    ? _getStatusColor(appointment.status).withValues(alpha: 0.15)
+                    : Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isOccupied
+                      ? _getStatusColor(appointment.status)
+                      : Colors.green.shade300,
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    slot,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isOccupied ? _getStatusText(appointment.status) : 'Available',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String? _normalizeTime(String? time) {
+    if (time == null) return null;
+    final cleaned = time.trim().toUpperCase();
+
+    final time24h = RegExp(r'^(\d{1,2}):(\d{2})(?::\d{2})?$');
+    final m24 = time24h.firstMatch(cleaned);
+    if (m24 != null) {
+      final hour = int.tryParse(m24.group(1) ?? '');
+      if (hour == null) return null;
+      return _hourToSlot(hour);
+    }
+
+    final timeAmPm = RegExp(r'^(\d{1,2}):(\d{2})\s*([AP]M)$');
+    final mAmPm = timeAmPm.firstMatch(cleaned.replaceAll(' ', ''));
+    if (mAmPm != null) {
+      final hour12 = int.tryParse(mAmPm.group(1) ?? '');
+      final ampm = mAmPm.group(3);
+      if (hour12 == null || ampm == null) return null;
+      final hour24 = (ampm == 'AM')
+          ? (hour12 == 12 ? 0 : hour12)
+          : (hour12 == 12 ? 12 : hour12 + 12);
+      return _hourToSlot(hour24);
+    }
+
+    final slots = const <String>[
+      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
+      '4:00 PM', '5:00 PM', '6:00 PM',
+    ];
+
+    for (final slot in slots) {
+      if (cleaned.contains(slot.toUpperCase())) return slot;
+    }
+
+    return null;
+  }
+
+  String? _hourToSlot(int hour24) {
+    if (hour24 < 8 || hour24 > 18) return null;
+    if (hour24 == 12) return '12:00 PM';
+    if (hour24 == 0) return '8:00 AM';
+    if (hour24 < 12) return '${hour24}:00 AM';
+    return '${hour24 - 12}:00 PM';
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'cancelled':
+        return Colors.red;
+      case 'completed':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'Occupied';
+      case 'pending':
+        return 'Pending';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status;
+    }
+  }
+
+  void _showAppointmentDetails(BuildContext context, Appointment appointment) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Appointment Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRow('Reason', appointment.reason),
+              _detailRow('Time', appointment.time ?? '-'),
+              _detailRow('Status', appointment.status),
+              _detailRow('Date', appointment.date),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/appointment_management');
+            },
+            child: const Text('View in Appointments'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Card(
       elevation: 2.0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+      child: Container(
+        padding: const EdgeInsets.all(12.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 28.0, color: color),
-            const SizedBox(height: 8.0),
+            Icon(icon, size: 24.0, color: color),
+            const SizedBox(height: 6.0),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4.0),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 color: Colors.grey,
               ),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -495,13 +559,15 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.0),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
         decoration: BoxDecoration(
           color: AppTheme.primaryGreen.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: AppTheme.primaryGreen, size: 28.0),
             const SizedBox(height: 8.0),
@@ -510,26 +576,15 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 color: AppTheme.primaryGreen,
+                fontSize: 11,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
       ),
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange;
-      case 'scheduled':
-        return Colors.blue;
-      case 'completed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
   }
 }

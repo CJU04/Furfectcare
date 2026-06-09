@@ -61,21 +61,49 @@ class AppRouter {
         return MaterialPageRoute(builder: (context) {
           final auth = context.watch<AuthProvider>();
           if (!auth.isSignedIn) return const LoginScreen();
-          if (auth.role != UserRole.admin) return const AccessDeniedScreen();
+          // Allow access if role is null or matches admin
+          if (auth.role != null && auth.role != UserRole.admin) return const AccessDeniedScreen();
           return const AdminDashboardScreen();
         });
       case customerDashboardRoute:
-        return MaterialPageRoute(builder: (_) => const CustomerDashboardScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          // Allow access if role is null or matches customer
+          if (auth.role != null && auth.role != UserRole.customer) return const AccessDeniedScreen();
+          return const CustomerDashboardScreen();
+        });
       case staffDashboardRoute:
-        return MaterialPageRoute(builder: (_) => const StaffDashboardScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          // Allow access if role is null or matches staff
+          if (auth.role != null && auth.role != UserRole.staff) return const AccessDeniedScreen();
+          return const StaffDashboardScreen();
+        });
       case veterinarianDashboardRoute:
-        return MaterialPageRoute(builder: (_) => const VeterinarianDashboardScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          // Allow access if role is null (still loading) - dashboard will load its own data
+          // Block only if role is explicitly set to something other than veterinarian
+          if (auth.role != null && auth.role != UserRole.veterinarian) return const AccessDeniedScreen();
+          return const VeterinarianDashboardScreen();
+        });
       case userManagementRoute:
         return MaterialPageRoute(builder: (_) => const UserManagementScreen());
       case petManagementRoute:
         return MaterialPageRoute(builder: (_) => const PetManagementScreen());
       case medicalHistoryRoute:
-        return MaterialPageRoute(builder: (_) => const MedicalHistoryScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          if (auth.role != null && auth.role != UserRole.admin &&
+              auth.role != UserRole.staff && auth.role != UserRole.veterinarian) {
+            return const AccessDeniedScreen();
+          }
+          return const MedicalHistoryScreen();
+        });
       case salesPosRoute:
         return MaterialPageRoute(builder: (_) => const SalesPosScreen());
       case inventoryLogsRoute:

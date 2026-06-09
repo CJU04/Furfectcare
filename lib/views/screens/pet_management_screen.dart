@@ -122,7 +122,7 @@ class _PetManagementScreenState extends State<PetManagementScreen> {
           );
         },
       ),
-      floatingActionButton: role?.value == 'customer' ? null : FloatingActionButton(
+      floatingActionButton: FloatingActionButton(
         onPressed: _addPet,
         child: const Icon(Icons.add),
       ),

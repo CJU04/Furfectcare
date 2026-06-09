@@ -112,9 +112,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login'),
-      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

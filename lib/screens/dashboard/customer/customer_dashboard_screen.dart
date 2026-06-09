@@ -29,15 +29,13 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     _selectedDay = _focusedDay;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<FirebaseUserProvider>(context, listen: false).loadUsers();
       Provider.of<PetProvider>(context, listen: false).loadPets();
       Provider.of<AppointmentProvider>(context, listen: false).loadAppointments();
     });
   }
 
-  List<Appointment> _getAppointmentsForDay(
-    DateTime day,
-    List<Appointment> appointments,
-  ) {
+  List<Appointment> _getAppointmentsForDay(DateTime day, List<Appointment> appointments) {
     return appointments.where((appointment) {
       try {
         final appointmentDate = DateTime.parse(appointment.date);
@@ -61,56 +59,38 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
 
     final String? uid = currentUser?.uid;
 
-    // Occupied appointments (calendar + day list)
-    final List<Appointment> occupiedAppointments = uid == null
+    // All scheduled appointments - for viewing occupied slots on calendar and time grid
+    final List<Appointment> allScheduledAppointments = appointmentProvider.appointments
+        .where((appt) => appt.status == 'scheduled')
+        .toList();
+
+    // Customer's own appointments - for stats and personal tracking
+    final List<Appointment> myAppointments = uid == null
         ? <Appointment>[]
         : appointmentProvider.appointments
             .where((appt) => appt.ownerUid == uid && appt.status == 'scheduled')
             .toList();
 
-    // Upcoming subset (future only)
     final String todayKey = DateTime.now().toString().split(' ')[0];
-    final List<Appointment> upcomingAppointments = occupiedAppointments
+    final List<Appointment> myUpcomingAppointments = myAppointments
         .where((appt) => appt.date.compareTo(todayKey) > 0)
         .toList();
 
     final int totalPets = petProvider.pets.length;
-    final int totalAppointments = upcomingAppointments.length;
+    final int totalAppointments = myUpcomingAppointments.length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Customer Dashboard'),
         backgroundColor: AppTheme.primaryGreen,
         foregroundColor: Colors.white,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/profile'),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                child: Text(
-                  (auth.displayName ?? currentUser?.fullname ?? 'C').isNotEmpty
-                      ? (auth.displayName ?? currentUser?.fullname ?? 'C')[0].toUpperCase()
-                      : 'C',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        actions: const [],
       ),
       drawer: const AppDrawer(currentRoute: '/customer'),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final bool isWide = constraints.maxWidth > 600;
           final double maxWidth = isWide ? 1000.0 : double.infinity;
-          final double? statCardWidth = isWide ? null : constraints.maxWidth;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -153,25 +133,38 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Quick Stats
-                    Row(
+                    // Quick Stats - 2 columns grid
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.3,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
                       children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            'My Pets',
-                            totalPets.toString(),
-                            Icons.pets,
-                            Colors.orange,
-                          ),
+                        _buildStatCard(
+                          'My Pets',
+                          totalPets.toString(),
+                          Icons.pets,
+                          Colors.orange,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            'Upcoming',
-                            totalAppointments.toString(),
-                            Icons.calendar_today,
-                            Colors.blue,
-                          ),
+                        _buildStatCard(
+                          'Upcoming',
+                          totalAppointments.toString(),
+                          Icons.calendar_today,
+                          Colors.blue,
+                        ),
+                        _buildStatCard(
+                          'Total Pets',
+                          totalPets.toString(),
+                          Icons.pets,
+                          Colors.green,
+                        ),
+                        _buildStatCard(
+                          'Appointments',
+                          appointmentProvider.appointments.length.toString(),
+                          Icons.event,
+                          Colors.teal,
                         ),
                       ],
                     ),
@@ -187,229 +180,28 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      height: 140,
-                      child: GridView.count(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 2.2,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: [
-                          _buildActionButton(
-                            context,
-                            'Add Pet',
-                            Icons.add,
-                            () => Navigator.pushNamed(context, '/add_pet'),
-                          ),
-                          _buildActionButton(
-                            context,
-                            'Appointments',
-                            Icons.calendar_today,
-                            () => Navigator.pushNamed(context, '/appointment_management'),
-                          ),
-                          _buildActionButton(
-                            context,
-                            'Product Catalog',
-                            Icons.shopping_bag,
-                            () => Navigator.pushNamed(context, '/product_catalog'),
-                          ),
-                          _buildActionButton(
-                            context,
-                            'Medical History',
-                            Icons.medical_services,
-                            () => Navigator.pushNamed(context, '/medical_history'),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // My Pets Section
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
                       children: [
-                        const Icon(Icons.pets, color: AppTheme.primaryGreen),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'My Pets',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        _buildActionButton(
+                          context,
+                          'Appointments',
+                          Icons.calendar_today,
+                          () => Navigator.pushNamed(context, '/appointment_management'),
+                        ),
+                        _buildActionButton(
+                          context,
+                          'Product Catalog',
+                          Icons.shopping_bag,
+                          () => Navigator.pushNamed(context, '/product_catalog'),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-
-                    if (petProvider.pets.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(32.0),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.pets, size: 48, color: Colors.grey),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'No pets added yet',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              onPressed: () => Navigator.pushNamed(context, '/add_pet'),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Add Your First Pet'),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: petProvider.pets.length,
-                        itemBuilder: (context, index) {
-                          final pet = petProvider.pets[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12.0),
-                            child: ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: const Icon(Icons.pets, color: AppTheme.primaryGreen),
-                              ),
-                              title: Text(
-                                pet.name,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('${pet.type} • ${pet.breed}'),
-                                  Text('Age: ${pet.age} years'),
-                                ],
-                              ),
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/pet_details',
-                                  arguments: pet,
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
 
                     const SizedBox(height: 24),
 
-                    // Upcoming Appointments Section
-                    Row(
-                      children: [
-                        const Icon(Icons.schedule, color: AppTheme.primaryGreen),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Upcoming Appointments',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    if (upcomingAppointments.isEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(32.0),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        child: const Column(
-                          children: [
-                            Icon(Icons.event_available, size: 48, color: Colors.grey),
-                            SizedBox(height: 12),
-                            Text(
-                              'No upcoming appointments',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: upcomingAppointments.length,
-                        itemBuilder: (context, index) {
-                          final appointment = upcomingAppointments[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12.0),
-                            child: ListTile(
-                              leading: Container(
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8.0),
-                                ),
-                                child: const Icon(Icons.calendar_today, color: Colors.blue),
-                              ),
-                              title: Text(
-                                appointment.reason,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Date: ${appointment.date.toString().split(' ')[0]}'),
-                                  Text('Time: ${appointment.time}'),
-                                ],
-                              ),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20.0),
-                                ),
-                                child: const Text(
-                                  'SCHEDULED',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.blue,
-                                  ),
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.pushNamed(context, '/appointment_management');
-                              },
-                            ),
-                          );
-                        },
-                      ),
-
-                    const SizedBox(height: 24),
-
-                    // Appointment Calendar (occupied)
+                    // Appointment Calendar
                     const Text(
                       'Appointment Calendar',
                       style: TextStyle(
@@ -431,7 +223,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                             focusedDay: _focusedDay,
                             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
                             calendarFormat: _calendarFormat,
-                            eventLoader: (day) => _getAppointmentsForDay(day, occupiedAppointments),
+                            eventLoader: (day) => _getAppointmentsForDay(day, allScheduledAppointments),
                             startingDayOfWeek: StartingDayOfWeek.monday,
                             calendarStyle: const CalendarStyle(
                               markersMaxCount: 3,
@@ -472,68 +264,16 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                               children: [
                                 Text(
                                   'Appointments for ${_selectedDay != null ? DateFormat('MMMM d, yyyy').format(_selectedDay!) : 'Today'}',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                                 ),
-                                const SizedBox(height: 8),
-                                if (_selectedDay == null)
-                                  const Text(
-                                    'Select a day to view occupied appointments',
-                                    style: TextStyle(color: Colors.grey),
-                                  )
-                                else
-                                  Builder(
-                                    builder: (context) {
-                                      final dayAppointments = _getAppointmentsForDay(
-                                        _selectedDay!,
-                                        occupiedAppointments,
-                                      );
-
-                                      if (dayAppointments.isEmpty) {
-                                        return const Text(
-                                          'No appointments for this day',
-                                          style: TextStyle(color: Colors.grey),
-                                        );
-                                      }
-
-                                      return Column(
-                                        children: dayAppointments.map((appointment) {
-                                          return ListTile(
-                                            leading: const Icon(
-                                              Icons.calendar_today,
-                                              color: AppTheme.primaryGreen,
-                                            ),
-                                            title: Text(appointment.reason),
-                                            subtitle: Text('Time: ${appointment.time}'),
-                                            trailing: Chip(
-                                              label: Text(
-                                                appointment.status,
-                                                style: const TextStyle(fontSize: 12),
-                                              ),
-                                              backgroundColor: Colors.grey.shade200,
-                                            ),
-                                            onTap: () {
-                                              Navigator.pushNamed(
-                                                context,
-                                                '/appointment_management',
-                                              );
-                                            },
-                                          );
-                                        }).toList(),
-                                      );
-                                    },
-                                  ),
+                                const SizedBox(height: 12),
+                                _buildTimeSlotGrid(context, _selectedDay, allScheduledAppointments, petProvider),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 12),
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -544,33 +284,283 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     );
   }
 
+  Widget _buildTimeSlotGrid(BuildContext context, DateTime? selectedDay, List<Appointment> appointments, PetProvider petProvider) {
+    final dayAppointments = selectedDay != null
+        ? _getAppointmentsForDay(selectedDay, appointments)
+        : <Appointment>[];
+
+    final timeSlots = [
+      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
+      '4:00 PM', '5:00 PM', '6:00 PM',
+    ];
+
+    final occupiedSlots = <String, Appointment>{};
+    for (var apt in dayAppointments) {
+      final timeKey = _normalizeTime(apt.time);
+      if (timeKey != null) {
+        occupiedSlots[timeKey] = apt;
+      }
+    }
+
+    return SizedBox(
+      height: 220,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 2.5,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: timeSlots.length,
+        itemBuilder: (context, index) {
+          final slot = timeSlots[index];
+          final appointment = occupiedSlots[slot];
+          final isOccupied = appointment != null;
+
+          return InkWell(
+            onTap: () {
+              if (isOccupied) {
+                _showAppointmentDetails(context, appointment, petProvider);
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isOccupied
+                    ? _getStatusColor(appointment.status).withValues(alpha: 0.15)
+                    : Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isOccupied
+                      ? _getStatusColor(appointment.status)
+                      : Colors.green.shade300,
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    slot,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isOccupied ? _getStatusText(appointment.status) : 'Available',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String? _normalizeTime(String? time) {
+    if (time == null) return null;
+    final cleaned = time.trim().toUpperCase();
+
+    final time24h = RegExp(r'^(\d{1,2}):(\d{2})(?::\d{2})?$');
+    final m24 = time24h.firstMatch(cleaned);
+    if (m24 != null) {
+      final hour = int.tryParse(m24.group(1) ?? '');
+      if (hour == null) return null;
+      return _hourToSlot(hour);
+    }
+
+    final timeAmPm = RegExp(r'^(\d{1,2}):(\d{2})\s*([AP]M)$');
+    final mAmPm = timeAmPm.firstMatch(cleaned.replaceAll(' ', ''));
+    if (mAmPm != null) {
+      final hour12 = int.tryParse(mAmPm.group(1) ?? '');
+      final ampm = mAmPm.group(3);
+      if (hour12 == null || ampm == null) return null;
+      final hour24 = (ampm == 'AM')
+          ? (hour12 == 12 ? 0 : hour12)
+          : (hour12 == 12 ? 12 : hour12 + 12);
+      return _hourToSlot(hour24);
+    }
+
+    final slots = const <String>[
+      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
+      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
+      '4:00 PM', '5:00 PM', '6:00 PM',
+    ];
+
+    for (final slot in slots) {
+      if (cleaned.contains(slot.toUpperCase())) return slot;
+    }
+
+    return null;
+  }
+
+  String? _hourToSlot(int hour24) {
+    if (hour24 < 8 || hour24 > 18) return null;
+    if (hour24 == 12) return '12:00 PM';
+    if (hour24 == 0) return '8:00 AM';
+    if (hour24 < 12) return '${hour24}:00 AM';
+    return '${hour24 - 12}:00 PM';
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      case 'cancelled':
+        return Colors.red;
+      case 'completed':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'Occupied';
+      case 'pending':
+        return 'Pending';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status;
+    }
+  }
+
+  void _showAppointmentDetails(BuildContext context, Appointment appointment, PetProvider petProvider) {
+    final firebaseUserProvider = Provider.of<FirebaseUserProvider>(context);
+    final currentUser = firebaseUserProvider.currentUser;
+    final String? uid = currentUser?.uid;
+
+    // Privacy check: only show details for own appointments
+    final isOwnAppointment = uid != null && appointment.ownerUid == uid;
+
+    if (!isOwnAppointment) {
+      // Show generic occupied message for other customers' appointments
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Appointment Slot'),
+          content: const Text('This time slot is occupied by another customer. Appointment details are private.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final pet = petProvider.pets
+        .where((p) => p.petId == appointment.petId)
+        .isNotEmpty
+        ? petProvider.pets.firstWhere((p) => p.petId == appointment.petId)
+        : null;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Appointment Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRow('Reason', appointment.reason),
+              _detailRow('Time', appointment.time ?? '-'),
+              _detailRow('Status', appointment.status),
+              _detailRow('Date', appointment.date),
+              _detailRow('Pet', pet != null ? '${pet.name} (${pet.type})' : 'Unknown'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/appointment_management');
+            },
+            child: const Text('View in Appointments'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Card(
       elevation: 2.0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+      child: Container(
+        padding: const EdgeInsets.all(12.0),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 28.0, color: color),
-            const SizedBox(height: 8.0),
+            Icon(icon, size: 24.0, color: color),
+            const SizedBox(height: 6.0),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4.0),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 color: Colors.grey,
               ),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -588,13 +578,15 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.0),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
         decoration: BoxDecoration(
           color: AppTheme.primaryGreen.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12.0),
           border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: AppTheme.primaryGreen, size: 28.0),
             const SizedBox(height: 8.0),
@@ -603,7 +595,11 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 color: AppTheme.primaryGreen,
+                fontSize: 11,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

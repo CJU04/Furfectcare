@@ -12,14 +12,15 @@ class AppDrawer extends StatelessWidget {
 
   const AppDrawer({super.key, required this.currentRoute});
 
-  String get _dashboardRoute {
-    switch (currentRoute) {
-      case '/customer':
+  String _getDashboardRoute(UserRole? role) {
+    switch (role?.value) {
+      case 'customer':
         return AppRouter.customerDashboardRoute;
-      case '/staff':
+      case 'staff':
         return AppRouter.staffDashboardRoute;
-      case '/veterinarian':
+      case 'veterinarian':
         return AppRouter.veterinarianDashboardRoute;
+      case 'admin':
       default:
         return AppRouter.adminDashboardRoute;
     }
@@ -54,96 +55,51 @@ class AppDrawer extends StatelessWidget {
             decoration: const BoxDecoration(
               color: AppTheme.primaryGreen,
             ),
-            accountName: const SizedBox.shrink(),
-            accountEmail: const SizedBox.shrink(),
-            currentAccountPicture: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 20),
-                photoUrl.isNotEmpty
-                    ? CircleAvatar(
-                        radius: 38,
-                        backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
-                        child: ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: photoUrl,
-                            width: 76,
-                            height: 76,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Text(
-                              (displayName.trim().isNotEmpty == true)
-                                  ? displayName.trim()[0].toUpperCase()
-                                  : 'G',
-                              style: const TextStyle(
-                                fontSize: 30,
-                                color: AppTheme.primaryGreen,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => Text(
-                              (displayName.trim().isNotEmpty == true)
-                                  ? displayName.trim()[0].toUpperCase()
-                                  : 'G',
-                              style: const TextStyle(
-                                fontSize: 30,
-                                color: AppTheme.primaryGreen,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                    : CircleAvatar(
-                        radius: 38,
-                        backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
-                        child: Text(
-                          (displayName.trim().isNotEmpty == true)
-                              ? displayName.trim()[0].toUpperCase()
-                              : 'G',
-                          style: const TextStyle(
-                            fontSize: 30,
-                            color: AppTheme.primaryGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    displayName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    userEmail,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
+            accountName: Text(
+              displayName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
+            accountEmail: Text(
+              userEmail,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 10,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            currentAccountPicture: photoUrl.isNotEmpty
+                ? CircleAvatar(
+                    radius: 38,
+                    backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                    backgroundImage: CachedNetworkImageProvider(photoUrl),
+                  )
+                : CircleAvatar(
+                    radius: 38,
+                    backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                    child: Text(
+                      displayName.trim().isNotEmpty
+                          ? displayName.trim()[0].toUpperCase()
+                          : 'G',
+                      style: const TextStyle(
+                        fontSize: 30,
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
           ),
           _buildDrawerItem(
             context,
             'Dashboard',
             Icons.dashboard,
-            _dashboardRoute,
+            _getDashboardRoute(role),
             isSelected: _isOnDashboard,
           ),
           if (isAdmin)
@@ -195,14 +151,14 @@ class AppDrawer extends StatelessWidget {
 selected: isSelected,
       selectedTileColor: const Color(0xFF2E7D32).withValues(alpha: 0.10),
       onTap: () {
-        // Close the drawer first; then navigate.
+        // Check if we're already on this route before closing drawer
+        if (currentRoute == route) {
+          Navigator.pop(context); // Just close the drawer
+          return;
+        }
+        // Close drawer, then navigate to the new route
         Navigator.pop(context);
-        if (currentRoute == route) return;
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          route,
-          (r) => false, // Remove all previous routes to prevent back navigation to splash
-        );
+        Navigator.pushNamed(context, route);
       },
     );
   }
