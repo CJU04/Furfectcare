@@ -1,0 +1,30 @@
+﻿00:00 +0: loading C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart
+00:00 +0: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TriangularMF returns 0 outside bounds
+00:00 +1: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TriangularMF returns 1 at peak
+00:00 +2: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TriangularMF linear interpolation on left slope
+00:00 +3: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TriangularMF linear interpolation on right slope
+00:00 +4: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TriangularMF temperature normal at 38┬░C
+00:00 +5: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TrapezoidalMF returns 1 in shoulder region
+00:00 +6: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TrapezoidalMF returns 0 outside bounds
+00:00 +7: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Membership Functions TrapezoidalMF linear interpolation on slopes
+00:00 +8: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzySet delegates to membership function
+00:00 +9: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyVariable fuzzifies input correctly
+00:00 +10: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyRule evaluates AND conditions with min
+00:00 +11: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyRule returns 0 if any condition missing
+00:00 +12: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyRule applies weight
+00:00 +13: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine engine created with correct structure
+00:00 +14: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine normal vitals produce low concern
+00:00 +15: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine high temp + poor appetite + low activity = high concern
+00:00 +16: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine very high temp = very high concern
+00:00 +17: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine severe symptoms + long duration = very high concern
+00:00 +18: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine low temp + very low activity = high concern
+00:00 +19: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine elevated temp + moderate symptoms + moderate duration = moderate concern
+00:00 +20: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine validates input ranges
+00:00 +21: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: FuzzyEngine validates missing input
+00:00 +22: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: VeterinaryAssessment assessWithDefaults works with partial inputs
+00:00 +23: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: VeterinaryAssessment assessWithDefaults uses defaults for unspecified
+00:00 +24: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Boundary Values temperature at exact boundaries
+00:00 +25: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Boundary Values temperature at max boundary
+00:00 +26: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/fuzzy_logic/fuzzy_logic_test.dart: Boundary Values deterministic results
+00:00 +27: C:/Users/Tsayter/Desktop/PROGRAMMING/System/FURFECTCARE VERSIONS/furfectcare_fixed/test/widget_test.dart: App renders with providers
+00:02 +28: All tests passed!

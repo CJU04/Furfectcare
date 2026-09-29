@@ -1,0 +1,5 @@
+﻿
+lib\views\screens\medical_history_screen.dart:124:        onTap: () => _showMedicalHistoryDetails(context, history),
+lib\views\screens\medical_history_screen.dart:169:  void _showMedicalHistoryDetails(
+
+

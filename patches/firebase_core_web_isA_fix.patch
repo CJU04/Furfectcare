@@ -1,0 +1,21 @@
+diff --git a/lib/src/firebase_core_web.dart b/lib/src/firebase_core_web.dart
+index xxxxxxx..xxxxxxx 100644
+--- a/lib/src/firebase_core_web.dart
++++ b/lib/src/firebase_core_web.dart
+@@ -394,7 +394,7 @@ class FirebaseCoreWeb extends FirebasePlatform {
+ 
+       try {
+         app = firebase.initializeApp(
+-          if (!e.isA<JSObject>()) {
++          if (!(e is JSObject)) {
+           rethrow;
+         }
+ 
+@@ -445,7 +445,7 @@ class FirebaseCoreWeb extends FirebasePlatform {
+ 
+     try {
+       app = guardNotInitialized(() => firebase.app(name));
+-      if (!e.isA<JSObject>()) {
++      if (!(e is JSObject)) {
+         rethrow;
+       }

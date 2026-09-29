@@ -40,7 +40,9 @@
       "Bash(flutter analyze lib/screens/dashboard/staff/staff_dashboard_screen.dart)",
       "Bash(flutter analyze lib/routes/app_router.dart lib/screens/dashboard/customer/customer_dashboard_screen.dart lib/screens/dashboard/staff/staff_dashboard_screen.dart lib/screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart)",
       "Bash(flutter analyze lib/views/screens/sales_pos_screen.dart lib/views/screens/appointment_management_screen.dart)",
-      "Bash(flutter analyze lib/views/screens/sales_pos_screen.dart lib/views/widgets/drawer_widget.dart lib/screens/dashboard/customer/customer_dashboard_screen.dart)"
+      "Bash(flutter analyze lib/views/screens/sales_pos_screen.dart lib/views/widgets/drawer_widget.dart lib/screens/dashboard/customer/customer_dashboard_screen.dart)",
+      "Bash(flutter analyze lib/screens/dashboard/customer/customer_dashboard_screen.dart lib/screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart)",
+      "Bash(flutter run)"
     ]
   }
 }

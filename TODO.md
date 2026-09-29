@@ -1,7 +1,10 @@
 # TODO
 
-## Inventory Log bottom overflow fix
-- [ ] Replace `InventoryLogsScreen` body layout with `SafeArea` + `CustomScrollView` using `SliverToBoxAdapter` (search) and `SliverList` (items) to prevent bottom `RenderFlex overflow`.
-- [ ] Verify no bottom overflow by running the app and navigating to Inventory Logs.
-- [ ] Run `flutter analyze` (or at least ensure no analyzer errors are introduced).
+- [x] Refactor `SalesPosScreen` UI to match the tested `ProductCatalogScreen` look/behavior
+  - [x] Replace POS product grid with the catalog-style responsive grid and `_ProductCard`
+  - [x] Replace POS cart area with catalog-style draggable bottom sheet cart (`_showCartSheet`, `_CartSheet`)
+  - [x] Ensure cart quantity +/- and remove UI match catalog behavior
+  - [x] Wire cart sheet "Place Order" to existing `_checkout()` logic
+  - [x] Keep role guard (block customer via `AccessDeniedScreen`)
+  - [ ] Verify builds (flutter analyze / run)
 

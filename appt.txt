@@ -1,0 +1,11 @@
+﻿
+lib\views\screens\appointment_management_screen.dart:119:                    onTap: () => 
+_showAppointmentDetails(context, a),
+lib\views\screens\appointment_management_screen.dart:442:                      InkWell(
+lib\views\screens\appointment_management_screen.dart:443:                        onTap: () async {
+lib\views\screens\appointment_management_screen.dart:475:                      InkWell(
+lib\views\screens\appointment_management_screen.dart:476:                        onTap: () async {
+lib\views\screens\appointment_management_screen.dart:1115:  void _showAppointmentDetails(BuildContext context, 
+Appointment appointment) {
+
+
