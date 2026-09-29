@@ -174,7 +174,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         _buildStatCard(
                           'Revenue',
-                          '\$${totalRevenue.toStringAsFixed(2)}',
+                          _formatCurrency(totalRevenue),
                           Icons.attach_money,
                           Colors.green.shade700,
                         ),
@@ -396,91 +396,135 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 2.5,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: timeSlots.length,
-      itemBuilder: (context, index) {
-        final slot = timeSlots[index];
-        final appointment = occupiedSlots[slot];
-        final isOccupied = appointment != null;
+    return SizedBox(
+      height: 220,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 2.5,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: timeSlots.length,
+        itemBuilder: (context, index) {
+          final slot = timeSlots[index];
+          final appointment = occupiedSlots[slot];
+          final isOccupied = appointment != null;
 
-        return InkWell(
-          onTap: () {
-            if (isOccupied) {
-              _showAppointmentDetails(context, appointment);
-            }
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              color: isOccupied
-                  ? _getStatusColor(appointment.status).withValues(alpha: 0.15)
-                  : Colors.green.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
+          return InkWell(
+            onTap: () {
+              if (isOccupied) {
+                _showAppointmentDetails(context, appointment);
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
                 color: isOccupied
-                    ? _getStatusColor(appointment.status)
-                    : Colors.green.shade300,
-                width: 1.5,
+                    ? _getStatusColor(appointment.status).withValues(alpha: 0.15)
+                    : Colors.green.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isOccupied
+                      ? _getStatusColor(appointment.status)
+                      : Colors.green.shade300,
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    slot,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isOccupied ? _getStatusText(appointment.status) : 'Available',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  slot,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: isOccupied ? _getStatusColor(appointment.status) : Colors.green.shade700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isOccupied ? _getStatusText(appointment.status) : 'Available',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isOccupied ? _getStatusColor(appointment.status) : Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   String? _normalizeTime(String? time) {
     if (time == null) return null;
     final cleaned = time.trim().toUpperCase();
-    // Match various time formats
-    final patterns = {
-      '8:00 AM': ['8:00 AM', '8:00 AM', '8:00 am', '08:00'],
-      '9:00 AM': ['9:00 AM', '9:00 am', '09:00'],
-      '10:00 AM': ['10:00 AM', '10:00 am', '10:00'],
-      '11:00 AM': ['11:00 AM', '11:00 am', '11:00'],
-      '12:00 PM': ['12:00 PM', '12:00 pm', '12:00'],
-      '1:00 PM': ['1:00 PM', '1:00 pm', '13:00'],
-      '2:00 PM': ['2:00 PM', '2:00 pm', '14:00'],
-      '3:00 PM': ['3:00 PM', '3:00 pm', '15:00'],
-      '4:00 PM': ['4:00 PM', '4:00 pm', '16:00'],
-      '5:00 PM': ['5:00 PM', '5:00 pm', '17:00'],
-      '6:00 PM': ['6:00 PM', '6:00 pm', '18:00'],
-    };
-    for (var entry in patterns.entries) {
-      if (cleaned.contains(entry.key) || entry.value.any((p) => cleaned.contains(p))) {
-        return entry.key;
-      }
+
+    // We only need the appointment slot by hour.
+    // Inputs we expect from booking UI: "HH:mm:00" (24h) or "h:mm AM/PM".
+
+    // 1) Handle 24h time like "14:30:00" or "14:30"
+    final time24h = RegExp(r'^(\d{1,2}):(\d{2})(?::\d{2})?$');
+    final m24 = time24h.firstMatch(cleaned);
+    if (m24 != null) {
+      final hour = int.tryParse(m24.group(1) ?? '');
+      if (hour == null) return null;
+      // Map hour to our display slots (8:00 AM ... 6:00 PM). For non-exact minutes,
+      // we still map to the containing hour.
+      return _hourToSlot(hour);
     }
+
+    // 2) Handle AM/PM formats like "10:30 AM" or "10:30:00 AM" (best-effort)
+    final timeAmPm = RegExp(r'^(\d{1,2}):(\d{2})\s*([AP]M)$');
+    final mAmPm = timeAmPm.firstMatch(cleaned.replaceAll(' ', ''));
+    if (mAmPm != null) {
+      final hour12 = int.tryParse(mAmPm.group(1) ?? '');
+      final ampm = mAmPm.group(3);
+      if (hour12 == null || ampm == null) return null;
+      final hour24 = (ampm == 'AM')
+          ? (hour12 == 12 ? 0 : hour12)
+          : (hour12 == 12 ? 12 : hour12 + 12);
+      return _hourToSlot(hour24);
+    }
+
+    // Fallback: try to find an exact slot key inside the string
+    final slots = const <String>[
+      '8:00 AM',
+      '9:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '12:00 PM',
+      '1:00 PM',
+      '2:00 PM',
+      '3:00 PM',
+      '4:00 PM',
+      '5:00 PM',
+      '6:00 PM',
+    ];
+
+    for (final slot in slots) {
+      if (cleaned.contains(slot.toUpperCase())) return slot;
+    }
+
     return null;
   }
+
+  String? _hourToSlot(int hour24) {
+    // Our grid is 8 AM - 6 PM (inclusive hours)
+    // Map hour24 directly:
+    // 08 -> 8:00 AM ... 11 -> 11:00 AM, 12 -> 12:00 PM, 13 -> 1:00 PM ... 18 -> 6:00 PM
+    if (hour24 < 8 || hour24 > 18) return null;
+
+    if (hour24 == 12) return '12:00 PM';
+    if (hour24 == 0) return '8:00 AM'; // shouldn't happen given range check
+    if (hour24 < 12) return '${hour24}:00 AM';
+    return '${hour24 - 12}:00 PM';
+  }
+
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
@@ -517,15 +561,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Appointment Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _detailRow('Reason', appointment.reason),
-            _detailRow('Time', appointment.time ?? '-'),
-            _detailRow('Status', appointment.status),
-            _detailRow('Date', appointment.date),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRow('Reason', appointment.reason),
+              _detailRow('Time', appointment.time ?? '-'),
+              _detailRow('Status', appointment.status),
+              _detailRow('Date', appointment.date),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -638,24 +684,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         borderRadius: BorderRadius.circular(12.0),
       ),
       child: Container(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 28.0, color: color),
-            const SizedBox(height: 8.0),
+            Icon(icon, size: 24.0, color: color),
+            const SizedBox(height: 6.0),
             Text(
               value,
               style: const TextStyle(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4.0),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 color: Colors.grey,
               ),
               textAlign: TextAlign.center,
@@ -678,8 +726,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.0),
       child: Container(
-        width: 100,
-        height: 80,
         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
         decoration: BoxDecoration(
           color: AppTheme.primaryGreen.withValues(alpha: 0.1),
@@ -688,6 +734,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: AppTheme.primaryGreen, size: 28.0),
             const SizedBox(height: 8.0),
@@ -708,6 +755,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  String _formatCurrency(double amount) {
+    // Format as Philippine Pesos (PHP) without decimals when possible.
+    // If you prefer a different currency symbol/text, adjust here.
+    final intValue = amount.round();
+    return '₱${intValue.toString()}';
+  }
+
   Color _getRoleColor(String role) {
     switch (role.toLowerCase()) {
       case 'admin':
@@ -723,3 +777,4 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 }
+

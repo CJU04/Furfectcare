@@ -52,7 +52,11 @@ class FirestoreDatabaseService {
 
   Future<List<Pet>> getPets() async {
     final snap = await _col('pets').get();
-    return snap.docs.map((d) => Pet.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final pet = Pet.fromMap(d.data());
+      pet.petId = d.id;
+      return pet;
+    }).toList();
   }
 
   Future<void> updatePet(Pet pet) async {
@@ -68,7 +72,11 @@ class FirestoreDatabaseService {
 
   Future<List<Pet>> getPetsByOwner(String ownerUid) async {
     final snap = await _col('pets').where('ownerUid', isEqualTo: ownerUid).get();
-    return snap.docs.map((d) => Pet.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final pet = Pet.fromMap(d.data());
+      pet.petId = d.id;
+      return pet;
+    }).toList();
   }
 
   // --------------------
@@ -76,29 +84,48 @@ class FirestoreDatabaseService {
   // --------------------
   Future<String> insertAppointment(Appointment appointment) async {
     final data = appointment.toMap();
+
     if (appointment.appointmentId != null) {
-      await _col('appointments').doc(appointment.appointmentId).set(data);
+      await _col('appointments')
+          .doc(appointment.appointmentId)
+          .set(data, SetOptions(merge: true));
       return appointment.appointmentId!;
     }
+
     final docRef = await _col('appointments').add(data);
+
+    // Ensure appointmentId is also persisted so update/edit flows that rely on it work.
+    await docRef.update({'appointmentId': docRef.id});
     return docRef.id;
   }
 
   Future<List<Appointment>> getAppointments() async {
     final snap = await _col('appointments').get();
-    return snap.docs.map((d) => Appointment.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final appt = Appointment.fromMap(d.data());
+      appt.appointmentId = d.id;
+      return appt;
+    }).toList();
   }
 
   Future<List<Appointment>> getAppointmentsByOwner(String ownerUid) async {
     final snap =
         await _col('appointments').where('ownerUid', isEqualTo: ownerUid).get();
-    return snap.docs.map((d) => Appointment.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final appt = Appointment.fromMap(d.data());
+      appt.appointmentId = d.id;
+      return appt;
+    }).toList();
   }
 
   Future<List<Appointment>> getAppointmentsByPet(String petId) async {
     final snap =
         await _col('appointments').where('petId', isEqualTo: petId).get();
-    return snap.docs.map((d) => Appointment.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final appt = Appointment.fromMap(d.data());
+      appt.appointmentId = d.id;
+      return appt;
+    }).toList();
   }
 
   Future<void> updateAppointment(Appointment appointment) async {
@@ -130,13 +157,21 @@ class FirestoreDatabaseService {
 
   Future<List<MedicalHistory>> getMedicalHistories() async {
     final snap = await _col('medical_histories').get();
-    return snap.docs.map((d) => MedicalHistory.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final hist = MedicalHistory.fromMap(d.data());
+      hist.historyId = d.id;
+      return hist;
+    }).toList();
   }
 
   Future<List<MedicalHistory>> getMedicalHistoriesByPet(String petId) async {
     final snap =
         await _col('medical_histories').where('petId', isEqualTo: petId).get();
-    return snap.docs.map((d) => MedicalHistory.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final hist = MedicalHistory.fromMap(d.data());
+      hist.historyId = d.id;
+      return hist;
+    }).toList();
   }
 
   Future<void> updateMedicalHistory(MedicalHistory history) async {
@@ -170,7 +205,14 @@ class FirestoreDatabaseService {
 
   Future<List<Product>> getProducts() async {
     final snap = await _col('products').get();
-    return snap.docs.map((d) => Product.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final data = d.data();
+      // Ensure productId is always set - use document ID if field is missing or empty
+      if (data['productId'] == null || (data['productId'] as String).isEmpty) {
+        data['productId'] = d.id;
+      }
+      return Product.fromMap(data);
+    }).toList();
   }
 
   Future<void> updateProduct(Product product) async {
