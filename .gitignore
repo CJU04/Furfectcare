@@ -43,3 +43,16 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Node dependencies
+functions/node_modules/
+node_modules/
+
+# Agent scratch tools
+.kilo/
+
+# Scratch logs and scripts
+*.log
+*.err
+*.txt
+*.py
