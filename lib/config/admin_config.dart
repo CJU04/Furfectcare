@@ -1,21 +1,48 @@
-// Admin verification configuration.
-//
-// PRODUCTION: Set ADMIN_VERIFICATION_CODE via a Firebase Remote Config
-// parameter or server-side secret. For local development / pre-production,
-// you may set it via the --dart-define flag:
-//
-//   flutter build apk --dart-define=ADMIN_VERIFICATION_CODE=dev_secret_code
-//
-// The String.fromEnvironment() call reads a Dart compile-time variable.
-// An empty string (default) means the secret is not configured —
-// in that case the admin verification check FAILS by default, preventing
-// anyone from registering as admin without a properly configured secret.
+/// Admin, Staff, and Veterinarian verification configuration.
+///
+/// DEVELOPMENT:
+/// Uses the hardcoded codes below if no --dart-define values are provided.
+///
+/// PRODUCTION:
+/// Pass the codes using:
+///
+/// flutter run --dart-define=ADMIN_VERIFICATION_CODE=your_admin_code \
+///             --dart-define=STAFF_VERIFICATION_CODE=your_staff_code \
+///             --dart-define=VETERINARIAN_CODE=your_vet_code
+///
+/// or load them from Firebase Remote Config.
+
+library;
+
+// ================================
+// Default Development Codes
+// ================================
+
+const String kAdminVerificationCode = 'admin_code123';
+const String kStaffVerificationCode = 'staff_code123';
+const String kVeterinarianVerificationCode = 'vet_code123';
+
+// ================================
+// Verification Code Getters
+// ================================
+
 String get adminVerificationCode {
-  const fromEnv = String.fromEnvironment(
+  return const String.fromEnvironment(
     'ADMIN_VERIFICATION_CODE',
-    defaultValue: '',
+    defaultValue: kAdminVerificationCode,
   );
-  return fromEnv;
 }
 
-const String kAdminVerificationCode = ''; // No embedded secret.
+String get staffVerificationCode {
+  return const String.fromEnvironment(
+    'STAFF_VERIFICATION_CODE',
+    defaultValue: kStaffVerificationCode,
+  );
+}
+
+String get veterinarianVerificationCode {
+  return const String.fromEnvironment(
+    'VETERINARIAN_CODE',
+    defaultValue: kVeterinarianVerificationCode,
+  );
+}

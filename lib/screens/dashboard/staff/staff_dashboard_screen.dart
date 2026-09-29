@@ -1,3 +1,4 @@
+import 'package:vetcare_connect/views/widgets/dashboard_action_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetcare_connect/providers/auth_provider.dart';
@@ -6,6 +7,7 @@ import 'package:vetcare_connect/providers/appointment_provider.dart';
 import 'package:vetcare_connect/providers/pet_provider.dart';
 import 'package:vetcare_connect/config/theme/app_theme.dart';
 import 'package:vetcare_connect/views/widgets/drawer_widget.dart';
+import 'package:vetcare_connect/views/widgets/notification_bell.dart';
 import 'package:vetcare_connect/models/appointment.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
@@ -26,7 +28,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
-    _loadData();
+    // Load after the first frame: notifyListeners() during build throws
+    // "setState() or markNeedsBuild() called during build".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
   }
 
   void _loadData() {
@@ -35,7 +41,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     Provider.of<PetProvider>(context, listen: false).loadPets();
   }
 
-  List<Appointment> _getAppointmentsForDay(DateTime day, List<Appointment> appointments) {
+  List<Appointment> _getAppointmentsForDay(
+      DateTime day, List<Appointment> appointments) {
     return appointments.where((appointment) {
       try {
         final appointmentDate = DateTime.parse(appointment.date);
@@ -56,11 +63,21 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final appointmentProvider = Provider.of<AppointmentProvider>(context);
     final petProvider = Provider.of<PetProvider>(context);
 
-    // Get today's appointments
+    // Staff sees all data since they manage operations
     final todayStr = DateTime.now().toString().split(' ')[0];
     final todayAppointments = appointmentProvider.appointments.where((appt) {
       return appt.date == todayStr;
     }).toList();
+
+    // Staff should also see veterinarian appointments in the same calendar/time grid.
+    // Appointments already represent assigned staff/vet via `assignedUserId`, so
+    // for "staff" dashboard we include both staff and veterinarian-assigned items.
+    final String currentUid = currentUser?.uid ?? '';
+    final List<Appointment> staffAndVetAppointments = currentUid.isEmpty
+        ? appointmentProvider.appointments
+        : appointmentProvider.appointments
+            .where((appt) => appt.assignedUserId?.toString() == currentUid)
+            .toList();
 
     final pendingCount = appointmentProvider.appointments
         .where((appt) => appt.status == 'pending')
@@ -74,7 +91,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
         title: const Text('Staff Dashboard'),
         backgroundColor: AppTheme.primaryGreen,
         foregroundColor: Colors.white,
-        actions: const [],
+        actions: const [NotificationBell()],
       ),
       drawer: const AppDrawer(currentRoute: '/staff'),
       body: LayoutBuilder(
@@ -136,24 +153,32 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                           todayAppointments.length.toString(),
                           Icons.calendar_today,
                           Colors.blue,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                         _buildStatCard(
                           'Pending',
                           pendingCount.toString(),
                           Icons.pending_actions,
                           Colors.orange,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                         _buildStatCard(
                           'Total Pets',
                           totalPets.toString(),
                           Icons.pets,
                           Colors.green,
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/pet_management'),
                         ),
                         _buildStatCard(
                           'Total Appointments',
                           totalAppointments.toString(),
                           Icons.event,
                           Colors.teal,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                       ],
                     ),
@@ -177,7 +202,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                           context,
                           'Appointments',
                           Icons.calendar_today,
-                          () => Navigator.pushNamed(context, '/appointment_management'),
+                          () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                         _buildActionButton(
                           context,
@@ -189,7 +215,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                           context,
                           'Medical History',
                           Icons.medical_services,
-                          () => Navigator.pushNamed(context, '/medical_history'),
+                          () =>
+                              Navigator.pushNamed(context, '/medical_history'),
                         ),
                         _buildActionButton(
                           context,
@@ -201,7 +228,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                           context,
                           'Product Inventory',
                           Icons.inventory_2,
-                          () => Navigator.pushNamed(context, '/product_inventory'),
+                          () => Navigator.pushNamed(
+                              context, '/product_inventory'),
                         ),
                         _buildActionButton(
                           context,
@@ -234,9 +262,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                             firstDay: DateTime.utc(2020, 1, 1),
                             lastDay: DateTime.utc(2030, 12, 31),
                             focusedDay: _focusedDay,
-                            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                            selectedDayPredicate: (day) =>
+                                isSameDay(_selectedDay, day),
                             calendarFormat: _calendarFormat,
-                            eventLoader: (day) => _getAppointmentsForDay(day, appointmentProvider.appointments),
+                            eventLoader: (day) => _getAppointmentsForDay(
+                                day, appointmentProvider.appointments),
                             startingDayOfWeek: StartingDayOfWeek.monday,
                             calendarStyle: CalendarStyle(
                               markersMaxCount: 3,
@@ -250,7 +280,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                               titleCentered: true,
                               formatButtonShowsNext: false,
                               formatButtonDecoration: BoxDecoration(
-                                border: Border.all(color: AppTheme.primaryGreen),
+                                border:
+                                    Border.all(color: AppTheme.primaryGreen),
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
                             ),
@@ -277,10 +308,13 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                               children: [
                                 Text(
                                   'Appointments for ${_selectedDay != null ? DateFormat('MMMM d, yyyy').format(_selectedDay!) : 'Today'}',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 12),
-                                _buildTimeSlotGrid(context, _selectedDay, appointmentProvider.appointments),
+                                _buildTimeSlotGrid(context, _selectedDay,
+                                    staffAndVetAppointments),
                               ],
                             ),
                           ),
@@ -297,15 +331,24 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     );
   }
 
-  Widget _buildTimeSlotGrid(BuildContext context, DateTime? selectedDay, List<Appointment> appointments) {
+  Widget _buildTimeSlotGrid(BuildContext context, DateTime? selectedDay,
+      List<Appointment> appointments) {
     final dayAppointments = selectedDay != null
         ? _getAppointmentsForDay(selectedDay, appointments)
         : <Appointment>[];
 
     final timeSlots = [
-      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
-      '4:00 PM', '5:00 PM', '6:00 PM',
+      '8:00 AM',
+      '9:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '12:00 PM',
+      '1:00 PM',
+      '2:00 PM',
+      '3:00 PM',
+      '4:00 PM',
+      '5:00 PM',
+      '6:00 PM',
     ];
 
     final occupiedSlots = <String, Appointment>{};
@@ -342,7 +385,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
             child: Container(
               decoration: BoxDecoration(
                 color: isOccupied
-                    ? _getStatusColor(appointment.status).withValues(alpha: 0.15)
+                    ? _getStatusColor(appointment.status)
+                        .withValues(alpha: 0.15)
                     : Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
@@ -360,15 +404,21 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green.shade700,
+                      color: isOccupied
+                          ? _getStatusColor(appointment.status)
+                          : Colors.green.shade700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isOccupied ? _getStatusText(appointment.status) : 'Available',
+                    isOccupied
+                        ? _getStatusText(appointment.status)
+                        : 'Available',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green,
+                      color: isOccupied
+                          ? _getStatusColor(appointment.status)
+                          : Colors.green,
                     ),
                   ),
                 ],
@@ -405,9 +455,17 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     }
 
     final slots = const <String>[
-      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
-      '4:00 PM', '5:00 PM', '6:00 PM',
+      '8:00 AM',
+      '9:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '12:00 PM',
+      '1:00 PM',
+      '2:00 PM',
+      '3:00 PM',
+      '4:00 PM',
+      '5:00 PM',
+      '6:00 PM',
     ];
 
     for (final slot in slots) {
@@ -421,7 +479,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     if (hour24 < 8 || hour24 > 18) return null;
     if (hour24 == 12) return '12:00 PM';
     if (hour24 == 0) return '8:00 AM';
-    if (hour24 < 12) return '${hour24}:00 AM';
+    if (hour24 < 12) return '$hour24:00 AM';
     return '${hour24 - 12}:00 PM';
   }
 
@@ -456,6 +514,19 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   }
 
   void _showAppointmentDetails(BuildContext context, Appointment appointment) {
+    // Get assigned veterinarian/staff from users
+    String assignedTo = 'Unassigned';
+    if (appointment.assignedUserId != null) {
+      final firebaseUserProvider =
+          Provider.of<FirebaseUserProvider>(context, listen: false);
+      final assignedUser = firebaseUserProvider.users
+          .where((u) => u.uid == appointment.assignedUserId)
+          .firstOrNull;
+      if (assignedUser != null) {
+        assignedTo = '${assignedUser.name} (${assignedUser.role.value})';
+      }
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -466,9 +537,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _detailRow('Reason', appointment.reason),
-              _detailRow('Time', appointment.time ?? '-'),
-              _detailRow('Status', appointment.status),
+              _detailRow('Time', appointment.time),
               _detailRow('Date', appointment.date),
+              _detailRow('Status', appointment.status),
+              _detailRow('Assigned To', assignedTo),
             ],
           ),
         ),
@@ -510,40 +582,50 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Card(
       elevation: 2.0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
       ),
-      child: Container(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24.0, color: color),
-            const SizedBox(height: 6.0),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Container(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 24.0, color: color),
+              const SizedBox(height: 6.0),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4.0),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
+              const SizedBox(height: 4.0),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -555,36 +637,6 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     IconData icon,
     VoidCallback onTap,
   ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12.0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppTheme.primaryGreen, size: 28.0),
-            const SizedBox(height: 8.0),
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primaryGreen,
-                fontSize: 11,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
+    return DashboardActionTile(label: label, icon: icon, onTap: onTap);
   }
 }

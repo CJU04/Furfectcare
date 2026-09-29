@@ -1,11 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vetcare_connect/providers/auth_provider.dart' as vet_auth;
+
 import 'package:vetcare_connect/providers/firebase_user_provider.dart';
+
 import 'package:vetcare_connect/providers/theme_provider.dart';
 import 'package:vetcare_connect/providers/notification_provider.dart';
 import 'package:vetcare_connect/views/widgets/drawer_widget.dart';
 
+import 'package:vetcare_connect/models/user_role.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class SettingsScreen extends StatelessWidget {
+  Future<void> _confirmAndDeleteAccount(BuildContext context) async {
+    final auth = FirebaseAuth.instance;
+    final current = auth.currentUser;
+    if (current == null) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete account'),
+        content:
+            const Text('This will permanently delete your account. Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    final uid = current.uid;
+
+    try {
+      // Soft-delete user document (client delete is blocked by firestore.rules)
+      await FirebaseFirestore.instance.collection('users').doc(uid).set(
+        {
+          'deleted': true,
+          'approved': false,
+        },
+        SetOptions(merge: true),
+      );
+
+      // Hard-delete Firebase Auth user
+      await current.delete();
+
+      // Sign out
+      await auth.signOut();
+
+      if (!context.mounted) return;
+      if (context.mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: ${e.message ?? e.code}')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed. Please try again.')),
+      );
+    }
+  }
+
   const SettingsScreen({super.key});
 
   @override
@@ -23,7 +91,9 @@ class SettingsScreen extends StatelessWidget {
           double maxWidth = constraints.maxWidth > 600 ? 600 : double.infinity;
           return ListView(
             padding: EdgeInsets.symmetric(
-              horizontal: constraints.maxWidth > 600 ? (constraints.maxWidth - maxWidth) / 2 : 16,
+              horizontal: constraints.maxWidth > 600
+                  ? (constraints.maxWidth - maxWidth) / 2
+                  : 16,
               vertical: 16,
             ),
             children: [
@@ -63,15 +133,27 @@ class SettingsScreen extends StatelessWidget {
                             },
                           ),
                           const Divider(height: 1),
-                          Consumer<NotificationProvider>(
-                            builder: (context, notificationProvider, child) {
+                          Consumer2<NotificationProvider,
+                              vet_auth.AuthProvider>(
+                            builder: (context, notificationProvider,
+                                authProvider, child) {
                               return SwitchListTile(
                                 secondary: const Icon(Icons.notifications),
                                 title: const Text('Notifications'),
-                                subtitle: const Text('Enable push notifications'),
-                                value: notificationProvider.notificationsEnabled,
-                                onChanged: (value) {
-                                  notificationProvider.setNotificationsEnabled(value);
+                                subtitle:
+                                    const Text('Enable push notifications'),
+                                value:
+                                    notificationProvider.notificationsEnabled,
+                                onChanged: (value) async {
+                                  await notificationProvider
+                                      .setNotificationsEnabled(value);
+
+                                  // Re-init with proper role to subscribe to role topics.
+                                  final roleValue = authProvider.role?.value;
+                                  if (value && roleValue != null) {
+                                    await notificationProvider.initialize(
+                                        role: roleValue);
+                                  }
                                 },
                               );
                             },
@@ -101,6 +183,20 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    _buildSectionHeader(context, 'Account Security'),
+                    if (currentUser != null &&
+                        currentUser.role == UserRole.customer)
+                      Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.delete_forever,
+                              color: Colors.red),
+                          title: const Text('Delete account'),
+                          subtitle:
+                              const Text('Permanently remove your account'),
+                          onTap: () => _confirmAndDeleteAccount(context),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
                     _buildSectionHeader(context, 'Support'),
                     Card(
                       child: Column(
@@ -122,7 +218,8 @@ class SettingsScreen extends StatelessWidget {
                                 context: context,
                                 applicationName: 'FurfectCare',
                                 applicationVersion: '1.0.0',
-                                applicationLegalese: '© 2024 FurfectCare\nPhilippine Data Privacy Act Compliant',
+                                applicationLegalese:
+                                    '© 2024 FurfectCare\nPhilippine Data Privacy Act Compliant',
                               );
                             },
                           ),

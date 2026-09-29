@@ -20,7 +20,8 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    await _auth.createUserWithEmailAndPassword(email: email, password: password);
+    await _auth.createUserWithEmailAndPassword(
+        email: email, password: password);
   }
 
   Future<void> sendPasswordResetEmail({required String email}) async {
@@ -31,4 +32,3 @@ class AuthService {
     await _auth.signOut();
   }
 }
-

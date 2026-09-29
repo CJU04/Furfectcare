@@ -7,6 +7,7 @@ import 'package:vetcare_connect/providers/appointment_provider.dart';
 import 'package:vetcare_connect/providers/product_provider.dart';
 import 'package:vetcare_connect/providers/sales_provider.dart';
 import 'package:vetcare_connect/views/widgets/drawer_widget.dart';
+import 'package:vetcare_connect/views/widgets/profile_avatar.dart';
 import 'package:vetcare_connect/config/theme/app_theme.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -31,11 +32,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final uid = authProvider.firebaseUser?.uid;
       if (uid != null) {
         Provider.of<PetProvider>(context, listen: false).loadPetsForOwner(uid);
-        Provider.of<AppointmentProvider>(context, listen: false).loadAppointmentsForOwner(uid);
+        Provider.of<AppointmentProvider>(context, listen: false)
+            .loadAppointmentsForOwner(uid);
       }
     } else {
       Provider.of<PetProvider>(context, listen: false).loadPets();
-      Provider.of<AppointmentProvider>(context, listen: false).loadAppointments();
+      Provider.of<AppointmentProvider>(context, listen: false)
+          .loadAppointments();
       Provider.of<ProductProvider>(context, listen: false).loadProducts();
       Provider.of<SalesProvider>(context, listen: false).loadSales();
     }
@@ -58,7 +61,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final totalPets = petProvider.pets.length;
     final todaysAppointments = appointmentProvider.appointments.length;
-    final lowStockProducts = productProvider.products.where((p) => p.stockQuantity < 10).length;
+    final lowStockProducts =
+        productProvider.products.where((p) => p.stockQuantity < 10).length;
     final totalSales = salesProvider.sales.length;
 
     return Scaffold(
@@ -66,6 +70,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: const Text('Dashboard'),
         backgroundColor: AppTheme.primaryGreen,
         foregroundColor: Colors.white,
+        actions: [
+          ProfileAvatar(
+            radius: 16,
+            onTap: () => Navigator.pushNamed(context, '/profile_settings'),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       drawer: const AppDrawer(currentRoute: '/dashboard'),
       body: LayoutBuilder(
@@ -108,12 +119,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           totalPets.toString(),
                           Icons.pets,
                           Colors.teal,
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/pet_management'),
                         ),
                         _buildMetricCard(
-                          isCustomer ? 'My Appointments' : "Today's Appointments",
+                          isCustomer
+                              ? 'My Appointments'
+                              : "Today's Appointments",
                           todaysAppointments.toString(),
                           Icons.calendar_today,
                           Colors.blue,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                         if (!isCustomer && (isAdmin || isStaff))
                           _buildMetricCard(
@@ -121,6 +138,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             lowStockProducts.toString(),
                             Icons.inventory,
                             Colors.orange,
+                            onTap: () => Navigator.pushNamed(
+                                context, '/product_inventory'),
                           ),
                         if (!isCustomer && (isAdmin || isStaff))
                           _buildMetricCard(
@@ -128,6 +147,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             totalSales.toString(),
                             Icons.point_of_sale,
                             AppTheme.primaryGreen,
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/sales_pos'),
                           ),
                       ],
                     ),
@@ -151,114 +172,130 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: isWide ? 1.2 : 1.3,
                       children: isCustomer
-                  ? [
-                      _buildQuickActionCard(
-                        context,
-                        'My Pets',
-                        Icons.pets,
-                        () => Navigator.pushNamed(context, '/pet_management'),
-                      ),
-                      _buildQuickActionCard(
-                        context,
-                        'Book Appointment',
-                        Icons.calendar_today,
-                        () => Navigator.pushNamed(context, '/appointment_management'),
-                      ),
-                      _buildQuickActionCard(
-                        context,
-                        'Medical History',
-                        Icons.medical_services,
-                        () => Navigator.pushNamed(context, '/medical_history'),
-                      ),
-                      _buildQuickActionCard(
-                        context,
-                        'Products',
-                        Icons.inventory,
-                        () => Navigator.pushNamed(context, '/product_inventory'),
-                      ),
-                    ]
-                  : isAdmin
-                      ? [
-                          _buildQuickActionCard(
-                            context,
-                            'Manage Pets',
-                            Icons.pets,
-                            () => Navigator.pushNamed(context, '/pet_management'),
-                          ),
-                          _buildQuickActionCard(
-                            context,
-                            'Appointments',
-                            Icons.calendar_today,
-                            () => Navigator.pushNamed(context, '/appointment_management'),
-                          ),
-                          _buildQuickActionCard(
-                            context,
-                            'Medical Records',
-                            Icons.medical_services,
-                            () => Navigator.pushNamed(context, '/medical_history'),
-                          ),
-                          _buildQuickActionCard(
-                            context,
-                            'Inventory',
-                            Icons.inventory,
-                            () => Navigator.pushNamed(context, '/product_inventory'),
-                          ),
-                          _buildQuickActionCard(
-                            context,
-                            'Sales POS',
-                            Icons.point_of_sale,
-                            () => Navigator.pushNamed(context, '/sales_pos'),
-                          ),
-                          _buildQuickActionCard(
-                            context,
-                            'Reports',
-                            Icons.bar_chart,
-                            () => Navigator.pushNamed(context, '/reports'),
-                          ),
-                        ]
-                      : isVet
                           ? [
                               _buildQuickActionCard(
                                 context,
-                                'Manage Pets',
+                                'My Pets',
                                 Icons.pets,
-                                () => Navigator.pushNamed(context, '/pet_management'),
+                                () => Navigator.pushNamed(
+                                    context, '/pet_management'),
                               ),
                               _buildQuickActionCard(
                                 context,
-                                'Appointments',
+                                'Book Appointment',
                                 Icons.calendar_today,
-                                () => Navigator.pushNamed(context, '/appointment_management'),
+                                () => Navigator.pushNamed(
+                                    context, '/appointment_management'),
                               ),
                               _buildQuickActionCard(
                                 context,
-                                'Medical Records',
+                                'Medical History',
                                 Icons.medical_services,
-                                () => Navigator.pushNamed(context, '/medical_history'),
+                                () => Navigator.pushNamed(
+                                    context, '/medical_history'),
+                              ),
+                              _buildQuickActionCard(
+                                context,
+                                'Products',
+                                Icons.inventory,
+                                () => Navigator.pushNamed(
+                                    context, '/product_inventory'),
                               ),
                             ]
-                          : isStaff
+                          : isAdmin
                               ? [
                                   _buildQuickActionCard(
                                     context,
-                                    'Products',
+                                    'Manage Pets',
+                                    Icons.pets,
+                                    () => Navigator.pushNamed(
+                                        context, '/pet_management'),
+                                  ),
+                                  _buildQuickActionCard(
+                                    context,
+                                    'Appointments',
+                                    Icons.calendar_today,
+                                    () => Navigator.pushNamed(
+                                        context, '/appointment_management'),
+                                  ),
+                                  _buildQuickActionCard(
+                                    context,
+                                    'Medical Records',
+                                    Icons.medical_services,
+                                    () => Navigator.pushNamed(
+                                        context, '/medical_history'),
+                                  ),
+                                  _buildQuickActionCard(
+                                    context,
+                                    'Inventory',
                                     Icons.inventory,
-                                    () => Navigator.pushNamed(context, '/product_inventory'),
+                                    () => Navigator.pushNamed(
+                                        context, '/product_inventory'),
                                   ),
                                   _buildQuickActionCard(
                                     context,
                                     'Sales POS',
                                     Icons.point_of_sale,
-                                    () => Navigator.pushNamed(context, '/sales_pos'),
+                                    () => Navigator.pushNamed(
+                                        context, '/sales_pos'),
                                   ),
                                   _buildQuickActionCard(
                                     context,
                                     'Reports',
                                     Icons.bar_chart,
-                                    () => Navigator.pushNamed(context, '/reports'),
+                                    () => Navigator.pushNamed(
+                                        context, '/reports'),
                                   ),
                                 ]
-                              : [],
+                              : isVet
+                                  ? [
+                                      _buildQuickActionCard(
+                                        context,
+                                        'Manage Pets',
+                                        Icons.pets,
+                                        () => Navigator.pushNamed(
+                                            context, '/pet_management'),
+                                      ),
+                                      _buildQuickActionCard(
+                                        context,
+                                        'Appointments',
+                                        Icons.calendar_today,
+                                        () => Navigator.pushNamed(
+                                            context, '/appointment_management'),
+                                      ),
+                                      _buildQuickActionCard(
+                                        context,
+                                        'Medical Records',
+                                        Icons.medical_services,
+                                        () => Navigator.pushNamed(
+                                            context, '/medical_history'),
+                                      ),
+                                    ]
+                                  : isStaff
+                                      ? [
+                                          _buildQuickActionCard(
+                                            context,
+                                            'Products',
+                                            Icons.inventory,
+                                            () => Navigator.pushNamed(
+                                                context, '/product_inventory'),
+                                          ),
+                                          _buildQuickActionCard(
+                                            context,
+                                            'Sales POS',
+                                            Icons.point_of_sale,
+                                            () => Navigator.pushNamed(
+                                                context, '/sales_pos'),
+                                          ),
+                                          _buildQuickActionCard(
+                                            context,
+                                            'Reports',
+                                            Icons.bar_chart,
+                                            () => Navigator.pushNamed(
+                                                context, '/reports'),
+                                          ),
+                                        ]
+                                      : [],
                     ),
                   ],
                 ),
@@ -275,7 +312,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: IconButton(
-          onPressed: () {},
+          onPressed: () => Navigator.pushNamed(context, '/pet_management'),
           icon: const Icon(
             Icons.add,
             color: Colors.black,
@@ -285,38 +322,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon, Color color) {
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Card(
       elevation: 3,
       shadowColor: Colors.grey.shade300,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 32, color: color),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade700,
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -361,4 +408,3 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 }
-

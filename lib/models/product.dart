@@ -5,6 +5,11 @@ class Product {
   String description;
   double price;
   int stockQuantity;
+  String? expirationDate;
+  int? minimumStock;
+  String? unit;
+  String? productCode;
+  String? imageUrl;
 
   Product({
     this.productId,
@@ -13,6 +18,11 @@ class Product {
     required this.description,
     required this.price,
     required this.stockQuantity,
+    this.expirationDate,
+    this.minimumStock,
+    this.unit,
+    this.productCode,
+    this.imageUrl,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +33,11 @@ class Product {
       'description': description,
       'price': price,
       'stockQuantity': stockQuantity,
+      'expirationDate': expirationDate,
+      'minimumStock': minimumStock,
+      'unit': unit,
+      'productCode': productCode,
+      'imageUrl': imageUrl,
     };
   }
 
@@ -34,6 +49,11 @@ class Product {
       description: map['description'] as String? ?? '',
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
       stockQuantity: map['stockQuantity'] as int? ?? 0,
+      expirationDate: map['expirationDate'] as String?,
+      minimumStock: map['minimumStock'] as int?,
+      unit: map['unit'] as String?,
+      productCode: map['productCode'] as String?,
+      imageUrl: map['imageUrl'] as String?,
     );
   }
 
@@ -44,6 +64,11 @@ class Product {
     String? description,
     double? price,
     int? stockQuantity,
+    String? expirationDate,
+    int? minimumStock,
+    String? unit,
+    String? productCode,
+    String? imageUrl,
   }) {
     return Product(
       productId: productId ?? this.productId,
@@ -52,6 +77,11 @@ class Product {
       description: description ?? this.description,
       price: price ?? this.price,
       stockQuantity: stockQuantity ?? this.stockQuantity,
+      expirationDate: expirationDate ?? this.expirationDate,
+      minimumStock: minimumStock ?? this.minimumStock,
+      unit: unit ?? this.unit,
+      productCode: productCode ?? this.productCode,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

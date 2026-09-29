@@ -1,0 +1,11 @@
+﻿Analyzing notification_bell.dart...                             
+
+  error - The method '_refresh' isn't defined for the type '_NotificationBellState' - lib\views\widgets\notification_bell.dart:63:13 - undefined_method
+
+flutter : 1 issue found. (ran in 6.8s)
+At line:1 char:1
++ flutter analyze --no-pub 'c:\Users\Tsayter\Desktop\PROGRAMMING\System ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (1 issue found. (ran in 6.8s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

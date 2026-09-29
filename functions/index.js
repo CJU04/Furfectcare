@@ -6,13 +6,17 @@ admin.initializeApp();
 // Callable function to request admin promotion
 // Expects data: { uid: string, code: string }
 // Secured by an ADMIN_SECRET stored in environment config (functions:config:set admin.secret="...")
-exports.requestAdmin = functions.https.onCall(async (data, context) => {
+// Callable function to auto-approve staff or veterinarian after successful registration
+// Expects data: { uid: string }
+// Secured by ADMIN_SECRET (same secret used elsewhere)
+exports.approveStaffOrVet = functions.https.onCall(async (data, context) => {
   const uid = data.uid;
   const code = data.code;
 
   if (!uid || !code) {
     throw new functions.https.HttpsError('invalid-argument', 'Missing uid or code');
   }
+
 
   // Only authenticated callers may request (optional — adjust as needed)
   if (!context.auth) {
@@ -32,7 +36,7 @@ exports.requestAdmin = functions.https.onCall(async (data, context) => {
   const firestore = admin.firestore();
   const userRef = firestore.collection('users').doc(uid);
 
-  await userRef.set({ role: 'admin', approved: true }, { merge: true });
+  await userRef.set({ approved: true }, { merge: true });
 
   // Set custom claim for admin
   try {
@@ -44,3 +48,8 @@ exports.requestAdmin = functions.https.onCall(async (data, context) => {
 
   return { success: true };
 });
+
+const { saveAppointment } = require('./scheduling');
+exports.saveAppointment = functions.https.onCall((data, context) =>
+  saveAppointment(admin.firestore(), context.auth?.uid, data));
+

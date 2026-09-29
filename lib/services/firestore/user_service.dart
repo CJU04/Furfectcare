@@ -29,15 +29,21 @@ class UserService {
       'createdAt': FieldValue.serverTimestamp(),
       // Approval flags: customers are auto-approved (self-registered).
       // Staff/vets need admin approval; admins are always approved.
-      'approved': role == UserRole.admin || role == UserRole.customer ? true : false,
+      'approved':
+          role == UserRole.admin || role == UserRole.customer ? true : false,
     });
   }
 
   Future<List<Map<String, dynamic>>> getAllUsers() async {
     final snapshot = await users.get();
-    return snapshot.docs.map((doc) => {
-      ...doc.data(),
-      'docId': doc.id,
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      // Defensive: older docs might miss `uid` field; always inject.
+      return {
+        ...data,
+        'uid': (data['uid'] as String?) ?? doc.id,
+        'docId': doc.id,
+      };
     }).toList();
   }
 
@@ -71,20 +77,28 @@ class UserService {
     await users.doc(uid).delete();
   }
 
-  Future<UserRole?> getUserRole(String uid) async {
-    final doc = await users.doc(uid).get();
-    final data = doc.data();
-    if (data == null) return null;
+  Future<UserRole> getUserRole(String uid) async {
+    try {
+      final doc = await users.doc(uid).get();
+      final data = doc.data();
+      if (data == null) return UserRole.customer;
 
-    return UserRoleX.fromValue(data['role'] as String?);
+      return UserRoleX.fromValue(data['role'] as String?) ?? UserRole.customer;
+    } catch (e) {
+      return UserRole.customer;
+    }
   }
 
-  Future<String?> getUserName(String uid) async {
-    final doc = await users.doc(uid).get();
-    final data = doc.data();
-    if (data == null) return null;
+  Future<String> getUserName(String uid) async {
+    try {
+      final doc = await users.doc(uid).get();
+      final data = doc.data();
+      if (data == null) return '';
 
-    return data['name'] as String?;
+      return data['name'] as String? ?? '';
+    } catch (e) {
+      return '';
+    }
   }
 
   Future<bool> isUserApproved(String uid) async {
@@ -99,4 +113,3 @@ class UserService {
     return (data['approved'] as bool?) ?? false;
   }
 }
-

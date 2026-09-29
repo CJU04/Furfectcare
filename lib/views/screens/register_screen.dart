@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vetcare_connect/providers/auth_provider.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:vetcare_connect/config/admin_config.dart';
+import 'package:vetcare_connect/utils/app_validators.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -21,6 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   UserRole _selectedRole = UserRole.customer;
   bool _isPasswordVisible = false;
   final _adminCodeController = TextEditingController();
+  final _staffVetAccessCodeController = TextEditingController();
   bool _acceptPrivacyPolicy = false;
   bool _isLoading = false;
 
@@ -33,7 +35,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            double maxWidth = constraints.maxWidth > 600 ? 400 : double.infinity;
+            double maxWidth =
+                constraints.maxWidth > 600 ? 400 : double.infinity;
             return SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Center(
@@ -46,7 +49,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       children: [
                         Text(
                           'Create Account',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
                                 color: Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -57,10 +63,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _passwordController,
                           decoration: InputDecoration(
                             labelText: 'Password',
+                            hintText: 'Example: Abc@1234',
+                            alignLabelWithHint: true,
                             prefixIcon: const Icon(Icons.lock),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                                _isPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -72,44 +82,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           obscureText: !_isPasswordVisible,
                           maxLength: 128,
+                          // Removes the bottom-right length counter (e.g., 0/120)
+                          buildCounter: (context,
+                                  {required currentLength,
+                                  required maxLength,
+                                  required isFocused}) =>
+                              null,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter a password';
-                            }
-                            if (value.length < 8) {
+                            final v = value ?? '';
+                            if (v.isEmpty) return 'Please enter a password';
+                            if (v.length < 8) {
                               return 'Password must be at least 8 characters';
                             }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _fullnameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Full Name',
-                            prefixIcon: Icon(Icons.person_outline),
-                            border: OutlineInputBorder(),
-                          ),
-                          maxLength: 100,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your full name';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _contactNumberController,
-                          decoration: const InputDecoration(
-                            labelText: 'Contact Number',
-                            prefixIcon: Icon(Icons.phone),
-                            border: OutlineInputBorder(),
-                          ),
-                          maxLength: 20,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your contact number';
+                            // Requirement: uppercase, lowercase, number, special character
+                            final hasUpper = RegExp(r'[A-Z]').hasMatch(v);
+                            final hasLower = RegExp(r'[a-z]').hasMatch(v);
+                            final hasNumber = RegExp(r'\d').hasMatch(v);
+                            final hasSpecial =
+                                RegExp(r'[^A-Za-z0-9]').hasMatch(v);
+
+                            if (!hasUpper ||
+                                !hasLower ||
+                                !hasNumber ||
+                                !hasSpecial) {
+                              return 'Password must include uppercase, lowercase, a number, and a special character';
                             }
                             return null;
                           },
@@ -119,20 +115,71 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _emailController,
                           decoration: const InputDecoration(
                             labelText: 'Email',
+                            hintText: 'Example: name@gmail.com',
                             prefixIcon: Icon(Icons.email),
                             border: OutlineInputBorder(),
                           ),
-                          maxLength: 254,
+                          keyboardType: TextInputType.emailAddress,
+                          // Removes the bottom-right length counter (e.g., 0/254)
+                          buildCounter: (context,
+                                  {required currentLength,
+                                  required maxLength,
+                                  required isFocused}) =>
+                              null,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
+                            final v = value?.trim() ?? '';
+                            if (v.isEmpty) {
                               return 'Please enter your email';
                             }
-                            final emailRegex = RegExp(r'^[\w.%+-]+@[\w.-]+\.[a-zA-Z]{2,}$');
-                            if (!emailRegex.hasMatch(value)) {
-                              return 'Please enter a valid email address';
+                            // Email must be a Gmail address only.
+                            // Example: name@gmail.com
+                            final emailRegex =
+                                RegExp(r'^[\w.%+-]+@gmail\.com$');
+                            if (!emailRegex.hasMatch(v)) {
+                              return 'Email must be a valid @gmail.com address';
+                            }
+
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _fullnameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Full Name',
+                            hintText: 'Example: Juan Dela Cruz',
+                            prefixIcon: Icon(Icons.person_outline),
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLength: 100,
+                          validator: (value) {
+                            final v = value?.trim() ?? '';
+                            if (v.isEmpty) {
+                              return 'Please enter your full name';
+                            }
+                            if (v.length < 5) {
+                              return 'Full name must be at least 5 characters';
                             }
                             return null;
                           },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _contactNumberController,
+                          decoration: const InputDecoration(
+                            labelText: 'Contact Number (PH)',
+                            hintText: 'Example: 09123456789',
+                            prefixIcon: Icon(Icons.phone),
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.phone,
+                          // Removes the bottom-right length counter (e.g., 0/20)
+                          buildCounter: (context,
+                                  {required currentLength,
+                                  required maxLength,
+                                  required isFocused}) =>
+                              null,
+                          validator: AppValidators.phoneNumber,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -144,15 +191,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           maxLength: 200,
                           validator: (value) {
-                            if (value == null || value.isEmpty) {
+                            final v = value?.trim() ?? '';
+                            if (v.isEmpty) {
                               return 'Please enter your address';
+                            }
+                            if (v.length < 5) {
+                              return 'Address must be at least 5 characters';
                             }
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<UserRole>(
-                          value: _selectedRole,
+                          initialValue: _selectedRole,
                           decoration: const InputDecoration(
                             labelText: 'Role',
                             prefixIcon: Icon(Icons.group),
@@ -171,7 +222,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        // Show admin access code field only when Admin is selected.
+                        // Access code fields for privileged roles.
+                        // Admin/staff/veterinarian must use different verification codes.
+
                         if (_selectedRole == UserRole.admin) ...[
                           TextFormField(
                             controller: _adminCodeController,
@@ -180,10 +233,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               prefixIcon: Icon(Icons.lock),
                               border: OutlineInputBorder(),
                             ),
+                            buildCounter: (context,
+                                    {required currentLength,
+                                    required maxLength,
+                                    required isFocused}) =>
+                                null,
                             validator: (value) {
                               if (_selectedRole == UserRole.admin) {
                                 if (value == null || value.isEmpty) {
                                   return 'Admin access code is required';
+                                }
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ] else if (_selectedRole == UserRole.staff ||
+                            _selectedRole == UserRole.veterinarian) ...[
+                          TextFormField(
+                            controller: _staffVetAccessCodeController,
+                            decoration: const InputDecoration(
+                              labelText: 'Access code',
+                              hintText: 'Example: STAFF123',
+                              prefixIcon: Icon(Icons.lock),
+                              border: OutlineInputBorder(),
+                            ),
+                            buildCounter: (context,
+                                    {required currentLength,
+                                    required maxLength,
+                                    required isFocused}) =>
+                                null,
+                            validator: (value) {
+                              if (_selectedRole == UserRole.staff ||
+                                  _selectedRole == UserRole.veterinarian) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Access code is required';
                                 }
                               }
                               return null;
@@ -212,7 +296,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: (_acceptPrivacyPolicy && !_isLoading) ? _register : null,
+                          onPressed: (_acceptPrivacyPolicy && !_isLoading)
+                              ? _register
+                              : null,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
@@ -250,7 +336,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_formKey.currentState!.validate()) {
       if (!_acceptPrivacyPolicy) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please accept the Data Privacy Act terms and conditions.')),
+          const SnackBar(
+              content: Text(
+                  'Please accept the Data Privacy Act terms and conditions.')),
         );
         return;
       }
@@ -261,20 +349,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final messenger = ScaffoldMessenger.of(context);
 
       try {
-        // If registering as admin, require correct verification code.
-        if (_selectedRole == UserRole.admin) {
-          final configured = adminVerificationCode;
-          // Fail closed: admin registration is disabled when no secret is configured.
+        // Access codes for privileged roles.
+        // - Admin, staff, and veterinarian use the same verification code.
+        if (_selectedRole == UserRole.admin ||
+            _selectedRole == UserRole.staff ||
+            _selectedRole == UserRole.veterinarian) {
+          final configured = switch (_selectedRole) {
+            UserRole.admin => adminVerificationCode,
+            UserRole.staff => staffVerificationCode,
+            UserRole.veterinarian => veterinarianVerificationCode,
+            _ => '',
+          };
+
+          // Fail closed: privileged registration is disabled when no secret is configured.
           if (configured.isEmpty) {
             messenger.showSnackBar(
-              const SnackBar(content: Text('Admin registration is not available.')),
+              const SnackBar(
+                  content: Text('Privileged registration is not available.')),
             );
             return;
           }
-          final provided = _adminCodeController.text.trim();
+
+          final provided = (_selectedRole == UserRole.admin)
+              ? _adminCodeController.text.trim()
+              : _staffVetAccessCodeController.text.trim();
+
           if (provided.isEmpty || provided != configured) {
             messenger.showSnackBar(
-              const SnackBar(content: Text('Invalid admin verification code.')),
+              const SnackBar(content: Text('Invalid access code.')),
             );
             return;
           }
@@ -282,7 +384,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         // When admin is requested, register the user with a safe default role
         // (customer) and then call a callable function to request promotion.
-        final registerRole = _selectedRole == UserRole.admin ? UserRole.customer : _selectedRole;
+        final registerRole =
+            _selectedRole == UserRole.admin ? UserRole.customer : _selectedRole;
 
         await authProvider.registerWithEmailPassword(
           email: _emailController.text.trim(),
@@ -296,34 +399,68 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // If admin was selected, call Cloud Function to request promotion.
         if (_selectedRole == UserRole.admin) {
           final uid = authProvider.firebaseUser?.uid;
-          if (uid == null) throw Exception('User created but UID not available');
+          if (uid == null)
+            throw Exception('User created but UID not available');
 
           final functions = FirebaseFunctions.instance;
           final callable = functions.httpsCallable('requestAdmin');
-          final resp = await callable.call(<String, dynamic>{'uid': uid, 'code': _adminCodeController.text.trim()});
+          final resp = await callable.call(<String, dynamic>{
+            'uid': uid,
+            'code': _adminCodeController.text.trim()
+          });
           final data = resp.data as Map<String, dynamic>?;
           if (data == null || data['success'] != true) {
-            messenger.showSnackBar(const SnackBar(content: Text('Admin request failed.')));
+            messenger.showSnackBar(
+                const SnackBar(content: Text('Admin request failed.')));
           } else {
-            messenger.showSnackBar(const SnackBar(content: Text('Admin access granted.')));
+            messenger.showSnackBar(
+                const SnackBar(content: Text('Admin access granted.')));
+          }
+        }
+
+        // Auto-approve staff or veterinarian after successful registration.
+        if (_selectedRole == UserRole.staff ||
+            _selectedRole == UserRole.veterinarian) {
+          final uid = authProvider.firebaseUser?.uid;
+          if (uid == null)
+            throw Exception('User created but UID not available');
+
+          final functions = FirebaseFunctions.instance;
+          final callable = functions.httpsCallable('approveStaffOrVet');
+
+          final code = _staffVetAccessCodeController.text.trim();
+          final resp =
+              await callable.call(<String, dynamic>{'uid': uid, 'code': code});
+          final data = resp.data as Map<String, dynamic>?;
+          if (data == null || data['success'] != true) {
+            messenger.showSnackBar(
+                const SnackBar(content: Text('Auto-approval failed.')));
+          } else {
+            messenger.showSnackBar(
+                const SnackBar(content: Text('Account approved.')));
           }
         }
 
         if (!mounted) return;
 
         messenger.showSnackBar(
-          const SnackBar(content: Text('Registration successful! Please login.')),
+          const SnackBar(
+              content: Text('Registration successful! Please login.')),
         );
         Navigator.pushReplacementNamed(context, '/login');
+      } catch (e) {
+        // Show specific, user-friendly reasons when possible.
+        final code = _extractFirebaseAuthCode(e);
+        if (code != null) {
+          messenger.showSnackBar(
+            SnackBar(content: Text(_firebaseAuthCodeToMessage(code))),
+          );
+          return;
+        }
 
-      } on Exception {
-        // Show a safe, user-friendly message without leaking system details.
         messenger.showSnackBar(
-          const SnackBar(content: Text('Registration failed. Please try again.')),
-        );
-      } catch (_) {
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Registration failed. Please try again.')),
+          const SnackBar(
+              content: Text('Registration failed. Please try again.')),
         );
       } finally {
         if (mounted) {
@@ -335,6 +472,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  String? _extractFirebaseAuthCode(Object e) {
+    // FirebaseAuthException has `code`, but we avoid importing extra types here.
+    final s = e.toString();
+    // Typical format: [firebase_auth/invalid-email] ... or FirebaseAuthException(code: 'invalid-email', ...)
+    final match = RegExp(r"firebase_auth/([a-zA-Z0-9_-]+)").firstMatch(s) ??
+        RegExp(r"code:\s*'([a-zA-Z0-9_-]+)'").firstMatch(s);
+    return match?.group(1);
+  }
+
+  String _firebaseAuthCodeToMessage(String code) {
+    switch (code) {
+      case 'invalid-email':
+        return 'Invalid email address. Check formatting and try again.';
+      case 'email-already-in-use':
+        return 'This email is already registered. Try logging in instead.';
+      case 'weak-password':
+        return 'Password is too weak. Use a stronger password.';
+      case 'operation-not-allowed':
+        return 'Email/password sign-in is disabled for this Firebase project.';
+      case 'network-request-failed':
+        return 'Network error. Check your internet connection and try again.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a moment and try again.';
+      default:
+        return 'Registration failed ($code). Please try again.';
+    }
+  }
+
   @override
   void dispose() {
     _passwordController.dispose();
@@ -343,7 +508,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _addressController.dispose();
     _adminCodeController.dispose();
+    _staffVetAccessCodeController.dispose();
     super.dispose();
   }
 }
-

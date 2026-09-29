@@ -48,6 +48,4 @@ extension UserRoleX on UserRole {
         return null;
     }
   }
-
 }
-

@@ -1,0 +1,7 @@
+lib\utils\search_sort.dart: SearchSortBar
+lib\views\screens\appointment_management_screen.dart: _sortOption, searchQuery
+lib\views\screens\inventory_logs_screen.dart: _sortBy, _sortOption, searchQuery
+lib\views\screens\medical_history_screen.dart: _sortBy, _sortOption, searchQuery
+lib\views\screens\pet_management_screen.dart: _showPetDetails, _sortOption, searchQuery
+lib\views\screens\product_inventory_screen.dart: _sortBy, _sortOption, searchQuery
+lib\views\screens\user_management_screen.dart: searchQuery

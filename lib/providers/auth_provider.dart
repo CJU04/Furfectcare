@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth/auth_service.dart';
 import '../services/firestore/user_service.dart';
 import '../models/user_role.dart';
+import '../utils/auth_error_mapper.dart';
 export '../models/user_role.dart';
 import 'firebase_user_provider.dart';
 
@@ -45,7 +46,8 @@ class AuthProvider extends ChangeNotifier {
       role = await _userService.getUserRole(firebaseUser!.uid);
       displayName = await _userService.getUserName(firebaseUser!.uid);
     } catch (e) {
-      errorMessage = fDebugPrint('Auth sync error: $e');
+      debugPrint('Auth sync error: ${AuthErrorMapper.debugDetail(e)}');
+      errorMessage = 'Unable to load your profile. Please try again.';
     } finally {
       isLoading = false;
       notifyListeners();
@@ -61,16 +63,27 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _authService.signInWithEmailPassword(email: email, password: password);
+      await _authService.signInWithEmailPassword(
+          email: email, password: password);
       firebaseUser = _authService.currentUser;
 
       if (firebaseUser != null) {
         role = await _userService.getUserRole(firebaseUser!.uid);
         displayName = await _userService.getUserName(firebaseUser!.uid);
-        await _firebaseUserProvider.syncCurrentFirebaseUser(firebaseUser!.uid);
+        try {
+          await _firebaseUserProvider
+              .syncCurrentFirebaseUser(firebaseUser!.uid);
+        } catch (e) {
+          // Profile sync is best-effort; login should still succeed.
+        }
       }
     } catch (e) {
-      errorMessage = fDebugPrint('Sign-in error: $e');
+      debugPrint('Sign-in error: ${AuthErrorMapper.debugDetail(e)}');
+      errorMessage = AuthErrorMapper.friendlyMessage(
+        e,
+        fallback:
+            'We couldn\'t sign you in. Please check your details and try again.',
+      );
       rethrow;
     } finally {
       isLoading = false;
@@ -91,7 +104,8 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _authService.registerWithEmailPassword(email: email, password: password);
+      await _authService.registerWithEmailPassword(
+          email: email, password: password);
       final uid = _authService.currentUser?.uid;
 
       if (uid == null) {
@@ -114,7 +128,11 @@ class AuthProvider extends ChangeNotifier {
         await _firebaseUserProvider.syncCurrentFirebaseUser(firebaseUser!.uid);
       }
     } catch (e) {
-      errorMessage = fDebugPrint('Registration error: $e');
+      debugPrint('Registration error: ${AuthErrorMapper.debugDetail(e)}');
+      errorMessage = AuthErrorMapper.friendlyMessage(
+        e,
+        fallback: 'We couldn\'t create your account. Please try again.',
+      );
       rethrow;
     } finally {
       isLoading = false;
@@ -130,7 +148,12 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.sendPasswordResetEmail(email: email);
     } catch (e) {
-      errorMessage = fDebugPrint('Reset error: $e');
+      debugPrint('Reset error: ${AuthErrorMapper.debugDetail(e)}');
+      errorMessage = AuthErrorMapper.friendlyMessage(
+        e,
+        fallback:
+            'We couldn\'t send the password reset email. Please try again.',
+      );
       rethrow;
     } finally {
       isLoading = false;
@@ -149,7 +172,8 @@ class AuthProvider extends ChangeNotifier {
       role = null;
       displayName = null;
     } catch (e) {
-      errorMessage = fDebugPrint('Sign-out error: $e');
+      debugPrint('Sign-out error: ${AuthErrorMapper.debugDetail(e)}');
+      errorMessage = 'We couldn\'t sign you out. Please try again.';
       rethrow;
     } finally {
       isLoading = false;
@@ -157,6 +181,3 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 }
-
-String fDebugPrint(Object e) => e.toString();
-

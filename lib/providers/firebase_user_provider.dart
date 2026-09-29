@@ -26,16 +26,25 @@ class FirebaseUser {
   });
 
   factory FirebaseUser.fromMap(Map<String, dynamic> map) {
+    final roleValue = map['role'] as String?;
+
+    // Defensive field fallbacks for older/alternate schemas.
+    final name = (map['name'] as String?) ?? (map['fullName'] as String?) ?? '';
+    final photoUrl =
+        (map['photoUrl'] as String?) ?? (map['photoURL'] as String?) ?? '';
+    final imageUrl =
+        (map['imageUrl'] as String?) ?? (map['imageURL'] as String?) ?? '';
+
     return FirebaseUser(
       uid: map['uid'] as String? ?? '',
-      name: map['name'] as String? ?? '',
+      name: name,
       email: map['email'] as String? ?? '',
-      role: UserRoleX.fromValue(map['role'] as String?) ?? UserRole.customer,
+      role: UserRoleX.fromValue(roleValue) ?? UserRole.customer,
       approved: map['approved'] as bool? ?? false,
       contactNumber: map['contactNumber'] as String? ?? '',
       address: map['address'] as String? ?? '',
-      imageUrl: map['imageUrl'] as String? ?? '',
-      photoUrl: map['photoUrl'] as String? ?? '',
+      imageUrl: imageUrl,
+      photoUrl: photoUrl,
     );
   }
 
@@ -94,9 +103,19 @@ class FirebaseUserProvider with ChangeNotifier {
   FirebaseUser? get currentUser => _currentUser;
 
   Future<void> loadUsers() async {
-    final maps = await _userService.getAllUsers();
-    _users = maps.map((map) => FirebaseUser.fromMap(map)).toList();
-    notifyListeners();
+    try {
+      final maps = await _userService.getAllUsers();
+      debugPrint(
+          'FirebaseUserProvider.loadUsers(): fetched ${maps.length} docs from /users');
+      _users = maps.map((map) => FirebaseUser.fromMap(map)).toList();
+      debugPrint(
+          'FirebaseUserProvider.loadUsers(): mapped to ${_users.length} FirebaseUser objects');
+      notifyListeners();
+    } catch (e, st) {
+      debugPrint('FirebaseUserProvider.loadUsers() failed: $e');
+      debugPrintStack(stackTrace: st);
+      rethrow;
+    }
   }
 
   Future<void> syncCurrentFirebaseUser(String uid) async {
@@ -139,8 +158,15 @@ class FirebaseUserProvider with ChangeNotifier {
       contactNumber: user.contactNumber,
       address: user.address,
       imageUrl: user.imageUrl,
+      photoUrl: user.photoUrl,
     );
     await loadUsers();
+    try {
+      _currentUser = _users.firstWhere((u) => u.uid == user.uid);
+    } on StateError {
+      _currentUser = user;
+    }
+    notifyListeners();
   }
 
   Future<void> deleteUser(String uid) async {

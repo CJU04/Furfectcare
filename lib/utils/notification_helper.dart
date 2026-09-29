@@ -12,7 +12,8 @@ class NotificationHelper {
     String? payload,
   }) async {
     try {
-      final provider = Provider.of<NotificationProvider>(context, listen: false);
+      final provider =
+          Provider.of<NotificationProvider>(context, listen: false);
       await provider.showNotification(
         title: title,
         body: body,
@@ -32,14 +33,17 @@ class NotificationHelper {
     required String petName,
     required String date,
     required String time,
+    String ownerName = 'Pet Owner',
   }) async {
     try {
-      final provider = Provider.of<NotificationProvider>(context, listen: false);
+      final provider =
+          Provider.of<NotificationProvider>(context, listen: false);
       await provider.showAppointmentReminder(
         appointmentId: appointmentId,
         petName: petName,
         date: date,
         time: time,
+        ownerName: ownerName,
       );
     } catch (e) {
       if (kDebugMode) {
@@ -55,7 +59,8 @@ class NotificationHelper {
     required int stockQuantity,
   }) async {
     try {
-      final provider = Provider.of<NotificationProvider>(context, listen: false);
+      final provider =
+          Provider.of<NotificationProvider>(context, listen: false);
       await provider.showNotification(
         title: 'Low Stock Alert',
         body: '$productName is running low ($stockQuantity remaining)',
@@ -78,7 +83,8 @@ class NotificationHelper {
     required String reason,
   }) async {
     try {
-      final provider = Provider.of<NotificationProvider>(context, listen: false);
+      final provider =
+          Provider.of<NotificationProvider>(context, listen: false);
       await provider.showNotification(
         title: 'New Appointment Booked',
         body: '$petName (Owner: $ownerName)\n$reason on $date at $time',
@@ -99,10 +105,12 @@ class NotificationHelper {
     required String time,
   }) async {
     try {
-      final provider = Provider.of<NotificationProvider>(context, listen: false);
+      final provider =
+          Provider.of<NotificationProvider>(context, listen: false);
       await provider.showNotification(
-        title: 'Appointment Confirmed!',
-        body: 'Your pet $petName\'s appointment is confirmed for $date at $time',
+        title: 'Appointment Scheduled!',
+        body:
+            'Your pet $petName\'s appointment is scheduled for $date at $time',
         payload: 'appointment_confirmed',
       );
     } catch (e) {
@@ -120,10 +128,12 @@ class NotificationHelper {
     required String time,
   }) async {
     try {
-      final provider = Provider.of<NotificationProvider>(context, listen: false);
+      final provider =
+          Provider.of<NotificationProvider>(context, listen: false);
       await provider.showNotification(
         title: 'Appointment Cancelled',
-        body: 'Your appointment for $petName on $date at $time has been cancelled',
+        body:
+            'Your appointment for $petName on $date at $time has been cancelled',
         payload: 'appointment_cancelled',
       );
     } catch (e) {

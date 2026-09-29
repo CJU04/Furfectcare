@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:io' as io;
-
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
-
+import 'package:vetcare_connect/utils/platform_image_picker.dart';
 
 import 'package:vetcare_connect/providers/auth_provider.dart';
 import 'package:vetcare_connect/providers/firebase_user_provider.dart';
+import 'package:vetcare_connect/services/storage_service.dart';
 import 'package:vetcare_connect/views/widgets/drawer_widget.dart';
 import 'package:vetcare_connect/config/theme/app_theme.dart';
 
@@ -26,9 +23,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   final _contactNumberController = TextEditingController();
   final _emailController = TextEditingController();
   final _addressController = TextEditingController();
-  io.File? _profileImage;
+  PickedFileData? _profileImage;
   final ImagePicker _picker = ImagePicker();
   bool _isEditing = false;
+  bool _isSaving = false;
+  double? _uploadProgress;
+  String? _uploadedPhotoUrl;
   bool _profileLoaded = false;
 
   @override
@@ -46,7 +46,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
 
   void _loadProfile() {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final firebaseUserProvider = Provider.of<FirebaseUserProvider>(context, listen: false);
+    final firebaseUserProvider =
+        Provider.of<FirebaseUserProvider>(context, listen: false);
     final currentUser = firebaseUserProvider.currentUser;
     if (currentUser != null) {
       _fullnameController.text = auth.displayName ?? currentUser.fullname;
@@ -79,56 +80,64 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   }
 
   void _cancelEditing() {
+    _profileImage = null; // Reset any selected image
+    _uploadedPhotoUrl = null;
     _loadProfile(); // reload original values
     setState(() {
       _isEditing = false;
     });
   }
 
-  void _saveProfile() async {
-    if (_formKey.currentState!.validate()) {
-      final firebaseUserProvider = Provider.of<FirebaseUserProvider>(context, listen: false);
-      final currentUser = firebaseUserProvider.currentUser;
-      final uid = Provider.of<AuthProvider>(context, listen: false).firebaseUser?.uid;
-
-      if (currentUser != null) {
-        final updatedUser = currentUser.copyWith(
-          name: _fullnameController.text,
-          contactNumber: _contactNumberController.text,
-          email: _emailController.text,
-          address: _addressController.text,
+  Future<void> _saveProfile() async {
+    if (_isSaving || !_formKey.currentState!.validate()) return;
+    final users = context.read<FirebaseUserProvider>();
+    final uid = context.read<AuthProvider>().firebaseUser?.uid;
+    if (uid == null) return;
+    setState(() {
+      _isSaving = true;
+      _uploadProgress = _profileImage == null ? null : 0;
+    });
+    try {
+      if (_profileImage != null && _uploadedPhotoUrl == null) {
+        _uploadedPhotoUrl = await StorageService.instance.uploadPickedFile(
+          data: _profileImage!,
+          folder: 'profile_pictures',
+          referenceName: 'profile_$uid',
+          onProgress: (value) {
+            if (mounted) setState(() => _uploadProgress = value);
+          },
         );
-        await firebaseUserProvider.updateUser(updatedUser);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!')),
-        );
-        setState(() {
-          _isEditing = false;
-        });
-        return;
       }
-
-      // currentUser was null — fetch and update directly
-      if (uid != null) {
-        final user = await firebaseUserProvider.getUserByUid(uid);
-        if (user != null) {
-          final updatedUser = user.copyWith(
-            name: _fullnameController.text,
-            contactNumber: _contactNumberController.text,
-            email: _emailController.text,
-            address: _addressController.text,
-          );
-          await firebaseUserProvider.updateUser(updatedUser);
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully!')),
-          );
-          setState(() {
-            _isEditing = false;
-          });
-        }
+      if (mounted) setState(() => _uploadProgress = null);
+      final user =
+          await users.getUserByUid(uid).timeout(const Duration(seconds: 30));
+      if (user == null)
+        throw StateError('Profile not found. Please sign in again.');
+      await users
+          .updateUser(user.copyWith(
+            name: _fullnameController.text.trim(),
+            email: _emailController.text.trim(),
+            contactNumber: _contactNumberController.text.trim(),
+            address: _addressController.text.trim(),
+            photoUrl: _uploadedPhotoUrl ?? user.photoUrl,
+          ))
+          .timeout(const Duration(seconds: 30));
+      if (!mounted) return;
+      _cancelEditing();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully!')),
+      );
+    } catch (e) {
+      // Retain the selection and completed upload URL for a safe retry.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Could not finish saving your profile. Check your connection '
+              'and retry. If a save timed out, refresh first to check whether it completed. $e'),
+        ));
       }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -146,13 +155,19 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           if (!_isEditing)
             IconButton(
               onPressed: _startEditing,
-              icon: const Icon(Icons.edit, color: Colors.white),
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
               tooltip: 'Edit Profile',
             )
           else
             IconButton(
               onPressed: _cancelEditing,
-              icon: const Icon(Icons.close, color: Colors.white),
+              icon: Icon(
+                Icons.close,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
               tooltip: 'Cancel',
             ),
         ],
@@ -181,18 +196,27 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                               alignment: Alignment.center,
                               children: [
                                 CircleAvatar(
-                                  key: ValueKey(_profileImage?.path),
+                                  key: ValueKey(_profileImage),
                                   radius: 44,
-                                  backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                                  backgroundColor: AppTheme.primaryGreen
+                                      .withValues(alpha: 0.2),
                                   backgroundImage: _getProfileImage(),
                                   child: _profileImage == null &&
-                                      (currentUser?.photoUrl == null || currentUser!.photoUrl!.isEmpty) &&
-                                      (currentUser?.imageUrl == null || currentUser!.imageUrl!.isEmpty)
+                                          (currentUser?.photoUrl.isEmpty ??
+                                              true) &&
+                                          (currentUser?.imageUrl.isEmpty ??
+                                              true)
                                       ? Text(
-                                          (displayName?.trim().isNotEmpty == true)
-                                              ? displayName!.trim()[0].toUpperCase()
+                                          (displayName?.trim().isNotEmpty ==
+                                                  true)
+                                              ? displayName!
+                                                  .trim()[0]
+                                                  .toUpperCase()
                                               : 'U',
-                                          style: const TextStyle(fontSize: 36, color: AppTheme.primaryGreen, fontWeight: FontWeight.bold),
+                                          style: const TextStyle(
+                                              fontSize: 36,
+                                              color: AppTheme.primaryGreen,
+                                              fontWeight: FontWeight.bold),
                                         )
                                       : null,
                                 ),
@@ -201,9 +225,16 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                                   right: 0,
                                   child: CircleAvatar(
                                     radius: 12,
-                                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                                    backgroundColor:
+                                        Theme.of(context).colorScheme.secondary,
                                     child: IconButton(
-                                      icon: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+                                      icon: Icon(
+                                        Icons.camera_alt,
+                                        size: 12,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSecondary,
+                                      ),
                                       onPressed: _pickImage,
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
@@ -214,92 +245,115 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                             ),
                           ),
                         ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _fullnameController,
-                readOnly: !_isEditing,
-                style: TextStyle(
-                  color: _isEditing ? null : Colors.grey.shade700,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'Full Name',
-                  prefixIcon: const Icon(Icons.person),
-                  border: const OutlineInputBorder(),
-                  filled: !_isEditing,
-                  fillColor: !_isEditing ? Colors.grey.shade100 : null,
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your full name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contactNumberController,
-                readOnly: !_isEditing,
-                style: TextStyle(
-                  color: _isEditing ? null : Colors.grey.shade700,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'Contact Number',
-                  prefixIcon: const Icon(Icons.phone),
-                  border: const OutlineInputBorder(),
-                  filled: !_isEditing,
-                  fillColor: !_isEditing ? Colors.grey.shade100 : null,
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your contact number';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                readOnly: true,
-                style: TextStyle(color: Colors.grey.shade700),
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: const Icon(Icons.email),
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _addressController,
-                readOnly: !_isEditing,
-                style: TextStyle(
-                  color: _isEditing ? null : Colors.grey.shade700,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'Address',
-                  prefixIcon: const Icon(Icons.home),
-                  border: const OutlineInputBorder(),
-                  filled: !_isEditing,
-                  fillColor: !_isEditing ? Colors.grey.shade100 : null,
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your address';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-              if (_isEditing)
-                ElevatedButton(
-                  onPressed: _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text('Save Changes'),
-                ),
-              ],
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _fullnameController,
+                          readOnly: !_isEditing,
+                          style: TextStyle(
+                            color: _isEditing
+                                ? null
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Full Name',
+                            prefixIcon: const Icon(Icons.person),
+                            border: const OutlineInputBorder(),
+                            filled: !_isEditing,
+                            fillColor: !_isEditing
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerLow
+                                : null,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your full name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _contactNumberController,
+                          readOnly: !_isEditing,
+                          style: TextStyle(
+                            color: _isEditing
+                                ? null
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Contact Number',
+                            prefixIcon: const Icon(Icons.phone),
+                            border: const OutlineInputBorder(),
+                            filled: !_isEditing,
+                            fillColor:
+                                !_isEditing ? Colors.grey.shade100 : null,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your contact number';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _emailController,
+                          readOnly: true,
+                          style: TextStyle(color: Colors.grey.shade700),
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: const Icon(Icons.email),
+                            border: const OutlineInputBorder(),
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _addressController,
+                          readOnly: !_isEditing,
+                          style: TextStyle(
+                            color: _isEditing ? null : Colors.grey.shade700,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Address',
+                            prefixIcon: const Icon(Icons.home),
+                            border: const OutlineInputBorder(),
+                            filled: !_isEditing,
+                            fillColor:
+                                !_isEditing ? Colors.grey.shade100 : null,
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your address';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 32),
+                        if (_isEditing)
+                          ElevatedButton(
+                            onPressed: _isSaving ? null : _saveProfile,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: _isSaving
+                                ? Column(children: [
+                                    LinearProgressIndicator(
+                                        value: _uploadProgress),
+                                    const SizedBox(height: 8),
+                                    Text(_uploadProgress == null
+                                        ? 'Saving profile…'
+                                        : 'Uploading photo ${(_uploadProgress! * 100).round()}%'),
+                                  ])
+                                : const Text('Save Changes'),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -312,16 +366,19 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   }
 
   ImageProvider? _getProfileImage() {
-    final firebaseUserProvider = Provider.of<FirebaseUserProvider>(context, listen: false);
+    final firebaseUserProvider =
+        Provider.of<FirebaseUserProvider>(context, listen: false);
     final currentUser = firebaseUserProvider.currentUser;
     if (_profileImage != null) {
-      return FileImage(_profileImage!);
+      return _profileImage!.previewProvider;
     }
-    if (currentUser?.photoUrl != null && currentUser!.photoUrl!.isNotEmpty) {
-      return CachedNetworkImageProvider(currentUser!.photoUrl!);
+    final photoUrl = currentUser?.photoUrl;
+    final imageUrl = currentUser?.imageUrl;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return CachedNetworkImageProvider(photoUrl);
     }
-    if (currentUser?.imageUrl != null && currentUser!.imageUrl!.isNotEmpty) {
-      return CachedNetworkImageProvider(currentUser!.imageUrl!);
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return CachedNetworkImageProvider(imageUrl);
     }
     return null;
   }
@@ -338,7 +395,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 title: const Text('Photo Library'),
                 onTap: () async {
                   Navigator.of(context).pop();
-                  final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+                  final XFile? image =
+                      await _picker.pickImage(source: ImageSource.gallery);
                   if (image != null) {
                     await _saveImageToAppDirectory(image);
                   }
@@ -349,7 +407,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                 title: const Text('Camera'),
                 onTap: () async {
                   Navigator.of(context).pop();
-                  final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+                  final XFile? image =
+                      await _picker.pickImage(source: ImageSource.camera);
                   if (image != null) {
                     await _saveImageToAppDirectory(image);
                   }
@@ -363,22 +422,21 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   }
 
   Future<void> _saveImageToAppDirectory(XFile image) async {
-    // For web paths, just store locally in memory.
-    if (image.path.startsWith('http') || image.path.startsWith('blob:') || image.path.startsWith('data:')) {
-      return;
+    final bytes = await image.readAsBytes();
+    if (bytes.isEmpty) throw StateError('The selected image is empty.');
+    if (bytes.length > PlatformImagePicker.maxImageBytes) {
+      throw PickedFileTooLargeException('Choose an image smaller than 5 MB.');
     }
-
-    // Mobile/desktop: copy to local documents directory.
-    final directory = await getApplicationDocumentsDirectory();
-    final fileName = path.basename(image.path);
-    final savedImage = await io.File(image.path).copy('${directory.path}/$fileName');
-
     if (!mounted) return;
     setState(() {
-      _profileImage = savedImage;
+      _profileImage = PickedFileData(
+        name: image.name,
+        bytes: bytes,
+        mimeType: PickedFileData.mimeForName(image.name),
+        size: bytes.length,
+      );
     });
   }
-
 
   @override
   void dispose() {
@@ -389,4 +447,3 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     super.dispose();
   }
 }
-

@@ -1,0 +1,20 @@
+﻿
+lib\views\screens\medical_history_screen.dart:46:    final isCustomer = role?.value == 'customer';
+lib\views\screens\medical_history_screen.dart:50:    if (isCustomer && uid != null) {
+lib\views\screens\medical_history_screen.dart:52:      final customerPetIds = petProvider.pets.where((pet) => 
+pet.ownerUid == uid).map((pet) => pet.petId).toList();
+lib\views\screens\medical_history_screen.dart:116:    final isCustomer = authProvider.role?.value == 'customer';
+lib\views\screens\medical_history_screen.dart:117:    final canAssess = !isCustomer;
+lib\views\screens\medical_history_screen.dart:142:        trailing: isCustomer
+lib\views\screens\medical_history_screen.dart:416:      availablePets = availablePets.where((pet) => pet.ownerUid == 
+uid).toList();
+lib\views\screens\medical_history_screen.dart:417:      availableAppointments = 
+availableAppointments.where((appointment) => appointment.ownerUid == uid).toList();
+lib\views\screens\medical_history_screen.dart:562:                          ownerUid: uid,
+lib\views\screens\medical_history_screen.dart:627:      availablePets = availablePets.where((pet) => pet.ownerUid == 
+uid).toList();
+lib\views\screens\medical_history_screen.dart:628:      availableAppointments = 
+availableAppointments.where((appointment) => appointment.ownerUid == uid).toList();
+lib\views\screens\medical_history_screen.dart:773:                          ownerUid: uid,
+
+

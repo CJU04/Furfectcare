@@ -1,3 +1,4 @@
+import 'package:vetcare_connect/views/widgets/dashboard_action_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetcare_connect/providers/auth_provider.dart';
@@ -61,119 +62,89 @@ class _VeterinarianDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final firebaseUserProvider =
-        context.watch<FirebaseUserProvider>();
-    final currentUser =
-        firebaseUserProvider.currentUser;
+    final firebaseUserProvider = context.watch<FirebaseUserProvider>();
+    final currentUser = firebaseUserProvider.currentUser;
 
-    final appointmentProvider =
-        context.watch<AppointmentProvider>();
+    final appointmentProvider = context.watch<AppointmentProvider>();
 
-    final petProvider =
-        context.watch<PetProvider>();
+    final petProvider = context.watch<PetProvider>();
 
-    final medicalHistoryProvider =
-        context.watch<MedicalHistoryProvider>();
+    final medicalHistoryProvider = context.watch<MedicalHistoryProvider>();
 
-    final todayStr = DateTime.now().toString().split(' ')[0];
-    final todayAppointments =
-        appointmentProvider.appointments.where((appt) {
-      final isAssignedToVet =
-          appt.assignedUserId.toString() ==
-              currentUser?.uid;
+    // Vet sees only their assigned appointments
+    final String todayStr = DateTime.now().toString().split(' ')[0];
+    final List<Appointment> myAppointments = currentUser?.uid == null
+        ? <Appointment>[]
+        : appointmentProvider.appointments
+            .where((appt) => appt.assignedUserId.toString() == currentUser?.uid)
+            .toList();
 
-      return isAssignedToVet &&
-          appt.date == todayStr;
+    final todayAppointments = myAppointments.where((appt) {
+      return appt.date == todayStr;
     }).toList();
 
-    final totalPets =
-        petProvider.pets.length;
+    final totalPets = petProvider.pets.length;
 
-    final totalMedicalRecords =
-        medicalHistoryProvider
-            .medicalHistories.length;
+    final totalMedicalRecords = medicalHistoryProvider.medicalHistories.length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Veterinarian Dashboard',
         ),
-        backgroundColor:
-            AppTheme.primaryGreen,
+        backgroundColor: AppTheme.primaryGreen,
         foregroundColor: Colors.white,
       ),
-
       drawer: const AppDrawer(
         currentRoute: '/veterinarian',
       ),
-
       body: LayoutBuilder(
         builder: (
           context,
           constraints,
         ) {
-          final isWide =
-              constraints.maxWidth > 600;
+          final isWide = constraints.maxWidth > 600;
           final maxWidth = isWide ? 1000.0 : double.infinity;
 
           return SingleChildScrollView(
-            padding:
-                const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Welcome Header
                     Container(
                       width: double.infinity,
-                      padding:
-                          const EdgeInsets.all(
-                              20),
-                      decoration:
-                          BoxDecoration(
-                        color: AppTheme
-                            .primaryGreen,
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                                    12),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen,
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Welcome, Dr. ${auth.displayName ?? currentUser?.fullname ?? 'Veterinarian'}!',
-                            style:
-                                const TextStyle(
+                            style: const TextStyle(
                               fontSize: 22,
-                              fontWeight:
-                                  FontWeight
-                                      .bold,
-                              color:
-                                  Colors.white,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
-                          const SizedBox(
-                              height: 4),
+                          const SizedBox(height: 4),
                           const Text(
                             'Here\'s your schedule for today',
-                            style:
-                                TextStyle(
-                              color: Colors
-                                  .white70,
+                            style: TextStyle(
+                              color: Colors.white70,
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                    const SizedBox(
-                        height: 24),
+                    const SizedBox(height: 24),
 
                     // Quick Stats - 2 columns grid
                     GridView.count(
@@ -186,52 +157,53 @@ class _VeterinarianDashboardScreenState
                       children: [
                         _buildStatCard(
                           'Today\'s Appointments',
-                          todayAppointments
-                              .length
-                              .toString(),
+                          todayAppointments.length.toString(),
                           Icons.calendar_today,
                           Colors.blue,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                         _buildStatCard(
                           'Pending',
-                          appointmentProvider.appointments
+                          myAppointments
                               .where((appt) => appt.status == 'pending')
                               .length
                               .toString(),
                           Icons.pending_actions,
                           Colors.orange,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                         _buildStatCard(
                           'Total Pets',
-                          totalPets
-                              .toString(),
+                          totalPets.toString(),
                           Icons.pets,
                           Colors.green,
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/pet_management'),
                         ),
                         _buildStatCard(
                           'Medical Records',
-                          totalMedicalRecords
-                              .toString(),
+                          totalMedicalRecords.toString(),
                           Icons.medical_services,
                           Colors.teal,
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/medical_history'),
                         ),
                       ],
                     ),
 
-                    const SizedBox(
-                        height: 24),
+                    const SizedBox(height: 24),
 
                     const Text(
                       'Quick Actions',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
 
-                    const SizedBox(
-                        height: 12),
+                    const SizedBox(height: 12),
 
                     Wrap(
                       spacing: 12,
@@ -270,24 +242,32 @@ class _VeterinarianDashboardScreenState
                             );
                           },
                         ),
+                        _buildActionButton(
+                          context,
+                          'Fuzzy Assessment',
+                          Icons.analytics_rounded,
+                          () {
+                            Navigator.pushNamed(
+                              context,
+                              '/fuzzy_assessment',
+                            );
+                          },
+                        ),
                       ],
                     ),
 
-                    const SizedBox(
-                        height: 24),
+                    const SizedBox(height: 24),
 
                     // Appointment Calendar
                     const Text(
                       'Appointment Calendar',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
 
-                    const SizedBox(
-                        height: 12),
+                    const SizedBox(height: 12),
 
                     Card(
                       elevation: 2.0,
@@ -300,9 +280,11 @@ class _VeterinarianDashboardScreenState
                             firstDay: DateTime.utc(2020, 1, 1),
                             lastDay: DateTime.utc(2030, 12, 31),
                             focusedDay: _focusedDay,
-                            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                            selectedDayPredicate: (day) =>
+                                isSameDay(_selectedDay, day),
                             calendarFormat: _calendarFormat,
-                            eventLoader: (day) => _getAppointmentsForDay(day, appointmentProvider.appointments),
+                            eventLoader: (day) =>
+                                _getAppointmentsForDay(day, myAppointments),
                             startingDayOfWeek: StartingDayOfWeek.monday,
                             calendarStyle: const CalendarStyle(
                               markersMaxCount: 3,
@@ -316,7 +298,8 @@ class _VeterinarianDashboardScreenState
                               titleCentered: true,
                               formatButtonShowsNext: false,
                               formatButtonDecoration: BoxDecoration(
-                                border: Border.all(color: AppTheme.primaryGreen),
+                                border:
+                                    Border.all(color: AppTheme.primaryGreen),
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
                             ),
@@ -343,10 +326,13 @@ class _VeterinarianDashboardScreenState
                               children: [
                                 Text(
                                   'Appointments for ${_selectedDay != null ? DateFormat('MMMM d, yyyy').format(_selectedDay!) : 'Today'}',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 12),
-                                _buildTimeSlotGrid(context, _selectedDay, appointmentProvider.appointments, petProvider),
+                                _buildTimeSlotGrid(
+                                    context, _selectedDay, myAppointments),
                               ],
                             ),
                           ),
@@ -363,15 +349,24 @@ class _VeterinarianDashboardScreenState
     );
   }
 
-  Widget _buildTimeSlotGrid(BuildContext context, DateTime? selectedDay, List<Appointment> appointments, PetProvider petProvider) {
+  Widget _buildTimeSlotGrid(BuildContext context, DateTime? selectedDay,
+      List<Appointment> appointments) {
     final dayAppointments = selectedDay != null
         ? _getAppointmentsForDay(selectedDay, appointments)
         : <Appointment>[];
 
     final timeSlots = [
-      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
-      '4:00 PM', '5:00 PM', '6:00 PM',
+      '8:00 AM',
+      '9:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '12:00 PM',
+      '1:00 PM',
+      '2:00 PM',
+      '3:00 PM',
+      '4:00 PM',
+      '5:00 PM',
+      '6:00 PM',
     ];
 
     final occupiedSlots = <String, Appointment>{};
@@ -402,13 +397,14 @@ class _VeterinarianDashboardScreenState
           return InkWell(
             onTap: () {
               if (isOccupied) {
-                _showAppointmentDetails(context, appointment, petProvider);
+                _showAppointmentDetails(context, appointment);
               }
             },
             child: Container(
               decoration: BoxDecoration(
                 color: isOccupied
-                    ? _getStatusColor(appointment.status).withValues(alpha: 0.15)
+                    ? _getStatusColor(appointment.status)
+                        .withValues(alpha: 0.15)
                     : Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
@@ -426,15 +422,21 @@ class _VeterinarianDashboardScreenState
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green.shade700,
+                      color: isOccupied
+                          ? _getStatusColor(appointment.status)
+                          : Colors.green.shade700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isOccupied ? _getStatusText(appointment.status) : 'Available',
+                    isOccupied
+                        ? _getStatusText(appointment.status)
+                        : 'Available',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green,
+                      color: isOccupied
+                          ? _getStatusColor(appointment.status)
+                          : Colors.green,
                     ),
                   ),
                 ],
@@ -471,9 +473,17 @@ class _VeterinarianDashboardScreenState
     }
 
     final slots = const <String>[
-      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
-      '4:00 PM', '5:00 PM', '6:00 PM',
+      '8:00 AM',
+      '9:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '12:00 PM',
+      '1:00 PM',
+      '2:00 PM',
+      '3:00 PM',
+      '4:00 PM',
+      '5:00 PM',
+      '6:00 PM',
     ];
 
     for (final slot in slots) {
@@ -521,14 +531,23 @@ class _VeterinarianDashboardScreenState
     }
   }
 
-  void _showAppointmentDetails(BuildContext context, Appointment appointment, PetProvider petProvider) {
-    final pet = petProvider.pets
-        .where((p) => p.petId == appointment.petId)
-        .isNotEmpty
-        ? petProvider.pets.firstWhere((p) => p.petId == appointment.petId)
-        : null;
-
-    final petInfo = pet != null ? '${pet.name} (${pet.type})' : 'Unknown';
+  void _showAppointmentDetails(BuildContext context, Appointment appointment) {
+    // Get assigned veterinarian/staff from users
+    String assignedTo = 'Unassigned';
+    if (appointment.assignedUserId != null &&
+        appointment.assignedUserId!.isNotEmpty) {
+      final firebaseUserProvider =
+          Provider.of<FirebaseUserProvider>(context, listen: false);
+      final assignedUser = firebaseUserProvider.users
+          .where((u) => u.uid == appointment.assignedUserId)
+          .firstOrNull;
+      if (assignedUser != null) {
+        assignedTo = '${assignedUser.name} (${assignedUser.role.value})';
+      } else {
+        // User not found in list, show the ID
+        assignedTo = 'User: ${appointment.assignedUserId}';
+      }
+    }
 
     showDialog(
       context: context,
@@ -541,9 +560,11 @@ class _VeterinarianDashboardScreenState
             children: [
               _detailRow('Reason', appointment.reason),
               _detailRow('Time', appointment.time),
-              _detailRow('Status', appointment.status),
               _detailRow('Date', appointment.date),
-              _detailRow('Pet', petInfo),
+              _detailRow('Status', appointment.status),
+              _detailRow('Assigned To', assignedTo),
+              if (appointment.assignedUserId != null)
+                _detailRow('Assigned ID', appointment.assignedUserId),
             ],
           ),
         ),
@@ -585,40 +606,50 @@ class _VeterinarianDashboardScreenState
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Card(
       elevation: 2.0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
       ),
-      child: Container(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24.0, color: color),
-            const SizedBox(height: 6.0),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Container(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 24.0, color: color),
+              const SizedBox(height: 6.0),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4.0),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
+              const SizedBox(height: 4.0),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -630,36 +661,6 @@ class _VeterinarianDashboardScreenState
     IconData icon,
     VoidCallback onTap,
   ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12.0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppTheme.primaryGreen, size: 28.0),
-            const SizedBox(height: 8.0),
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primaryGreen,
-                fontSize: 11,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
+    return DashboardActionTile(label: label, icon: icon, onTap: onTap);
   }
 }

@@ -8,6 +8,9 @@ class Pet {
   String gender;
   String vaccinationStatus;
   String healthNotes;
+  String? imageUrl;
+  String?
+      vaccinationProofUrl; // proof document when vaccinationStatus is up to date
 
   Pet({
     this.petId,
@@ -19,6 +22,8 @@ class Pet {
     required this.gender,
     required this.vaccinationStatus,
     required this.healthNotes,
+    this.imageUrl,
+    this.vaccinationProofUrl,
   });
 
   Map<String, dynamic> toMap() {
@@ -32,6 +37,8 @@ class Pet {
       'gender': gender,
       'vaccination_status': vaccinationStatus,
       'healthnotes': healthNotes,
+      'imageUrl': imageUrl,
+      'vaccinationProofUrl': vaccinationProofUrl,
     };
   }
 
@@ -46,6 +53,8 @@ class Pet {
       gender: map['gender'] as String? ?? '',
       vaccinationStatus: map['vaccination_status'] as String? ?? '',
       healthNotes: map['healthnotes'] as String? ?? '',
+      imageUrl: map['imageUrl'] as String?,
+      vaccinationProofUrl: map['vaccinationProofUrl'] as String?,
     );
   }
 
@@ -59,6 +68,8 @@ class Pet {
     String? gender,
     String? vaccinationStatus,
     String? healthNotes,
+    String? imageUrl,
+    String? vaccinationProofUrl,
   }) {
     return Pet(
       petId: petId ?? this.petId,
@@ -70,6 +81,8 @@ class Pet {
       gender: gender ?? this.gender,
       vaccinationStatus: vaccinationStatus ?? this.vaccinationStatus,
       healthNotes: healthNotes ?? this.healthNotes,
+      imageUrl: imageUrl ?? this.imageUrl,
+      vaccinationProofUrl: vaccinationProofUrl ?? this.vaccinationProofUrl,
     );
   }
 }
