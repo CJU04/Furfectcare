@@ -21,7 +21,6 @@ class Appointment {
 
   Map<String, dynamic> toMap() {
     return {
-      'appointmentId': appointmentId,
       'petId': petId,
       'ownerUid': ownerUid,
       'assignedUserId': assignedUserId,
@@ -65,5 +64,35 @@ class Appointment {
       reason: reason ?? this.reason,
       status: status ?? this.status,
     );
+  }
+
+  /// Parses the stored [date] (+ optional [time]) into a DateTime for
+  /// sorting/searching. The `date` field is stored as a plain `yyyy-MM-dd`
+  /// string (or ISO-8601 in legacy rows) so this handles both, and any
+  /// failure falls back to a sortable sentinel instead of crashing.
+  static DateTime _parseDateValue(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
+    final parsed = DateTime.tryParse(trimmed);
+    if (parsed != null) return parsed;
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  /// Combined sortable timestamp using date + time ("HH:mm").
+  DateTime get scheduledDateTime {
+    final d = _parseDateValue(date);
+    final match = RegExp(r'^\s*(\d{1,2}):(\d{2})').firstMatch(time);
+    if (match != null) {
+      return DateTime(d.year, d.month, d.day, int.parse(match.group(1)!),
+          int.parse(match.group(2)!));
+    }
+    return d;
+  }
+
+  /// True when this appointment starts sometime today (local time).
+  bool get isToday {
+    final d = _parseDateValue(date);
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
   }
 }

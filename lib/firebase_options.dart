@@ -10,10 +10,10 @@ class DefaultFirebaseOptions {
       messagingSenderId: '589310427700',
       projectId: 'vetcare-connect-d3daf',
       storageBucket: 'vetcare-connect-d3daf.firebasestorage.app',
-      iosBundleId: 'com.example.vetcareConnect', // Update this if you use iOS
+      authDomain: 'vetcare-connect-d3daf.firebaseapp.com',
+      iosBundleId: 'com.example.vetcareConnect',
     );
   }
-
 
   /// Android-specific Firebase options
   static const FirebaseOptions android = FirebaseOptions(
@@ -24,4 +24,3 @@ class DefaultFirebaseOptions {
     storageBucket: 'vetcare-connect-d3daf.firebasestorage.app',
   );
 }
-

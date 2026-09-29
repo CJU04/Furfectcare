@@ -48,4 +48,14 @@ class InventoryLog {
       reason: reason ?? this.reason,
     );
   }
+
+  /// Sortable timestamp for the stored `date` string (`yyyy-MM-dd`, ISO-8601
+  /// in legacy rows, or blank). Unparseable values sort as epoch so the list
+  /// never crashes on dirty data.
+  DateTime get loggedAt {
+    final trimmed = date.trim();
+    if (trimmed.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0);
+    final parsed = DateTime.tryParse(trimmed);
+    return parsed ?? DateTime.fromMillisecondsSinceEpoch(0);
+  }
 }

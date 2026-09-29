@@ -32,7 +32,7 @@ class CustomButton extends StatelessWidget {
           backgroundColor: backgroundColor ?? AppColors.primary,
           foregroundColor: textColor ?? Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.borderRadius),
+            borderRadius: BorderRadius.circular(AppLayout.borderRadius),
           ),
           elevation: 4,
         ),
@@ -56,4 +56,3 @@ class CustomButton extends StatelessWidget {
     );
   }
 }
-

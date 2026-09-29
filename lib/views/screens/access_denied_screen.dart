@@ -62,4 +62,3 @@ class AccessDeniedScreen extends StatelessWidget {
     );
   }
 }
-

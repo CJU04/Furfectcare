@@ -7,6 +7,7 @@ import '../screens/auth/forgot_password_screen.dart';
 import '../screens/dashboard/admin/admin_dashboard_screen.dart';
 import '../screens/dashboard/customer/customer_dashboard_screen.dart';
 import '../screens/dashboard/staff/staff_dashboard_screen.dart';
+import '../algorithms/ui/fuzzy_assessment.dart';
 import '../screens/dashboard/veterinarian/veterinarian_dashboard_screen.dart';
 import '../providers/auth_provider.dart';
 import '../views/screens/access_denied_screen.dart';
@@ -19,9 +20,12 @@ import '../views/screens/reports_screen.dart';
 import '../views/screens/appointment_management_screen.dart';
 import '../views/screens/product_inventory_screen.dart';
 import '../views/screens/settings_screen.dart';
+import '../views/screens/notification_center_screen.dart';
 import '../views/screens/profile_settings_screen.dart';
 import '../views/screens/dashboard_screen.dart';
 import '../views/screens/product_catalog_screen.dart';
+import '../views/screens/product_history_screen.dart';
+import '../views/screens/medical_documents_screen.dart';
 
 class AppRouter {
   static const String splashRoute = '/splash';
@@ -46,6 +50,10 @@ class AppRouter {
   static const String profileSettingsRoute = '/profile_settings';
   static const String dashboardRoute = '/dashboard';
   static const String productCatalogRoute = '/product_catalog';
+  static const String productHistoryRoute = '/product_history';
+  static const String fuzzyAssessmentRoute = '/fuzzy_assessment';
+  static const String notificationCenterRoute = '/notifications';
+  static const String medicalDocumentsRoute = '/medical_documents';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -62,7 +70,8 @@ class AppRouter {
           final auth = context.watch<AuthProvider>();
           if (!auth.isSignedIn) return const LoginScreen();
           // Allow access if role is null or matches admin
-          if (auth.role != null && auth.role != UserRole.admin) return const AccessDeniedScreen();
+          if (auth.role != null && auth.role != UserRole.admin)
+            return const AccessDeniedScreen();
           return const AdminDashboardScreen();
         });
       case customerDashboardRoute:
@@ -70,7 +79,8 @@ class AppRouter {
           final auth = context.watch<AuthProvider>();
           if (!auth.isSignedIn) return const LoginScreen();
           // Allow access if role is null or matches customer
-          if (auth.role != null && auth.role != UserRole.customer) return const AccessDeniedScreen();
+          if (auth.role != null && auth.role != UserRole.customer)
+            return const AccessDeniedScreen();
           return const CustomerDashboardScreen();
         });
       case staffDashboardRoute:
@@ -78,7 +88,8 @@ class AppRouter {
           final auth = context.watch<AuthProvider>();
           if (!auth.isSignedIn) return const LoginScreen();
           // Allow access if role is null or matches staff
-          if (auth.role != null && auth.role != UserRole.staff) return const AccessDeniedScreen();
+          if (auth.role != null && auth.role != UserRole.staff)
+            return const AccessDeniedScreen();
           return const StaffDashboardScreen();
         });
       case veterinarianDashboardRoute:
@@ -87,44 +98,142 @@ class AppRouter {
           if (!auth.isSignedIn) return const LoginScreen();
           // Allow access if role is null (still loading) - dashboard will load its own data
           // Block only if role is explicitly set to something other than veterinarian
-          if (auth.role != null && auth.role != UserRole.veterinarian) return const AccessDeniedScreen();
+          if (auth.role != null && auth.role != UserRole.veterinarian)
+            return const AccessDeniedScreen();
           return const VeterinarianDashboardScreen();
         });
+      case fuzzyAssessmentRoute:
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          if (auth.role != null && auth.role != UserRole.veterinarian)
+            return const AccessDeniedScreen();
+          return const FuzzyAssessmentScreen();
+        });
       case userManagementRoute:
-        return MaterialPageRoute(builder: (_) => const UserManagementScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          if (auth.role != null && auth.role != UserRole.admin)
+            return const AccessDeniedScreen();
+          return const UserManagementScreen();
+        });
       case petManagementRoute:
-        return MaterialPageRoute(builder: (_) => const PetManagementScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return const PetManagementScreen();
+        });
       case medicalHistoryRoute:
         return MaterialPageRoute(builder: (context) {
           final auth = context.watch<AuthProvider>();
           if (!auth.isSignedIn) return const LoginScreen();
-          if (auth.role != null && auth.role != UserRole.admin &&
-              auth.role != UserRole.staff && auth.role != UserRole.veterinarian) {
+          if (auth.role != null &&
+              auth.role != UserRole.admin &&
+              auth.role != UserRole.staff &&
+              auth.role != UserRole.veterinarian) {
             return const AccessDeniedScreen();
           }
           return const MedicalHistoryScreen();
         });
       case salesPosRoute:
-        return MaterialPageRoute(builder: (_) => const SalesPosScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          if (auth.role == UserRole.customer) return const AccessDeniedScreen();
+          return const SalesPosScreen();
+        });
       case inventoryLogsRoute:
-        return MaterialPageRoute(builder: (_) => const InventoryLogsScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          if (auth.role != UserRole.staff &&
+              auth.role != UserRole.admin &&
+              auth.role != UserRole.veterinarian)
+            return const AccessDeniedScreen();
+          return const InventoryLogsScreen();
+        });
       case reportsRoute:
-        return MaterialPageRoute(builder: (_) => const ReportsScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          if (auth.role != UserRole.staff &&
+              auth.role != UserRole.admin &&
+              auth.role != UserRole.veterinarian)
+            return const AccessDeniedScreen();
+          return const ReportsScreen();
+        });
       case appointmentManagementRoute:
-        return MaterialPageRoute(builder: (_) => const AppointmentManagementScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return AppointmentManagementScreen(
+              recordId: settings.arguments is Map
+                  ? (settings.arguments as Map)['recordId'] as String?
+                  : null);
+        });
       case productInventoryRoute:
-        return MaterialPageRoute(builder: (_) => const ProductInventoryScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return const ProductInventoryScreen();
+        });
       case settingsRoute:
-        return MaterialPageRoute(builder: (_) => const SettingsScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return const SettingsScreen();
+        });
       case profileSettingsRoute:
-        return MaterialPageRoute(builder: (_) => const ProfileSettingsScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return const ProfileSettingsScreen();
+        });
       case productCatalogRoute:
-        return MaterialPageRoute(builder: (_) => const ProductCatalogScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return const ProductCatalogScreen();
+        });
+      case productHistoryRoute:
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return ProductHistoryScreen(
+              recordId: settings.arguments is Map
+                  ? (settings.arguments as Map)['recordId'] as String?
+                  : null);
+        });
+      case notificationCenterRoute:
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return const NotificationCenterScreen();
+        });
+      case medicalDocumentsRoute:
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          // Medical documents are staff-facing only; customers manage
+          // vaccination proofs from their pet records instead.
+          if (auth.role != null &&
+              auth.role != UserRole.admin &&
+              auth.role != UserRole.staff &&
+              auth.role != UserRole.veterinarian) {
+            return const AccessDeniedScreen();
+          }
+          return const MedicalDocumentsScreen();
+        });
       case dashboardRoute:
-        return MaterialPageRoute(builder: (_) => const DashboardScreen());
+        return MaterialPageRoute(builder: (context) {
+          final auth = context.watch<AuthProvider>();
+          if (!auth.isSignedIn) return const LoginScreen();
+          return const DashboardScreen();
+        });
+
       default:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
     }
   }
 }
-

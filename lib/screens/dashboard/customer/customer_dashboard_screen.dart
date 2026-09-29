@@ -1,3 +1,4 @@
+import 'package:vetcare_connect/views/widgets/dashboard_action_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -5,17 +6,21 @@ import 'package:table_calendar/table_calendar.dart';
 
 import 'package:vetcare_connect/config/theme/app_theme.dart';
 import 'package:vetcare_connect/models/appointment.dart';
+import 'package:vetcare_connect/models/pet.dart';
 import 'package:vetcare_connect/providers/appointment_provider.dart';
 import 'package:vetcare_connect/providers/auth_provider.dart';
 import 'package:vetcare_connect/providers/firebase_user_provider.dart';
 import 'package:vetcare_connect/providers/pet_provider.dart';
+import 'package:vetcare_connect/utils/appointment_scheduling.dart';
 import 'package:vetcare_connect/views/widgets/drawer_widget.dart';
+import 'package:vetcare_connect/views/widgets/notification_bell.dart';
 
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
 
   @override
-  State<CustomerDashboardScreen> createState() => _CustomerDashboardScreenState();
+  State<CustomerDashboardScreen> createState() =>
+      _CustomerDashboardScreenState();
 }
 
 class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
@@ -31,11 +36,13 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<FirebaseUserProvider>(context, listen: false).loadUsers();
       Provider.of<PetProvider>(context, listen: false).loadPets();
-      Provider.of<AppointmentProvider>(context, listen: false).loadAppointments();
+      Provider.of<AppointmentProvider>(context, listen: false)
+          .loadAppointments();
     });
   }
 
-  List<Appointment> _getAppointmentsForDay(DateTime day, List<Appointment> appointments) {
+  List<Appointment> _getAppointmentsForDay(
+      DateTime day, List<Appointment> appointments) {
     return appointments.where((appointment) {
       try {
         final appointmentDate = DateTime.parse(appointment.date);
@@ -59,32 +66,32 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
 
     final String? uid = currentUser?.uid;
 
-    // All scheduled appointments - for viewing occupied slots on calendar and time grid
-    final List<Appointment> allScheduledAppointments = appointmentProvider.appointments
-        .where((appt) => appt.status == 'scheduled')
-        .toList();
+    // Filter to customer's own data only
+    final List<Pet> myPets = uid == null
+        ? <Pet>[]
+        : petProvider.pets.where((pet) => pet.ownerUid == uid).toList();
 
-    // Customer's own appointments - for stats and personal tracking
+    // Keep myAppointments for “My appointments” and viewing details.
     final List<Appointment> myAppointments = uid == null
         ? <Appointment>[]
         : appointmentProvider.appointments
-            .where((appt) => appt.ownerUid == uid && appt.status == 'scheduled')
+            .where((appt) => appt.ownerUid == uid)
             .toList();
 
-    final String todayKey = DateTime.now().toString().split(' ')[0];
-    final List<Appointment> myUpcomingAppointments = myAppointments
-        .where((appt) => appt.date.compareTo(todayKey) > 0)
-        .toList();
+    // Occupancy should be computed from ALL appointments so customers see
+    // real availability, but the UI will only show appointment details for
+    // their own appointments.
+    final List<Appointment> allAppointments = appointmentProvider.appointments;
 
-    final int totalPets = petProvider.pets.length;
-    final int totalAppointments = myUpcomingAppointments.length;
+    final int totalPets = myPets.length;
+    final int totalAppointments = myAppointments.length;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Customer Dashboard'),
         backgroundColor: AppTheme.primaryGreen,
         foregroundColor: Colors.white,
-        actions: const [],
+        actions: const [NotificationBell()],
       ),
       drawer: const AppDrawer(currentRoute: '/customer'),
       body: LayoutBuilder(
@@ -147,24 +154,16 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                           totalPets.toString(),
                           Icons.pets,
                           Colors.orange,
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/pet_management'),
                         ),
                         _buildStatCard(
-                          'Upcoming',
+                          'My Appointments',
                           totalAppointments.toString(),
                           Icons.calendar_today,
                           Colors.blue,
-                        ),
-                        _buildStatCard(
-                          'Total Pets',
-                          totalPets.toString(),
-                          Icons.pets,
-                          Colors.green,
-                        ),
-                        _buildStatCard(
-                          'Appointments',
-                          appointmentProvider.appointments.length.toString(),
-                          Icons.event,
-                          Colors.teal,
+                          onTap: () => Navigator.pushNamed(
+                              context, '/appointment_management'),
                         ),
                       ],
                     ),
@@ -186,15 +185,23 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                       children: [
                         _buildActionButton(
                           context,
-                          'Appointments',
-                          Icons.calendar_today,
-                          () => Navigator.pushNamed(context, '/appointment_management'),
+                          'My Pets',
+                          Icons.pets,
+                          () => Navigator.pushNamed(context, '/pet_management'),
                         ),
                         _buildActionButton(
                           context,
-                          'Product Catalog',
+                          'Appointments',
+                          Icons.calendar_today,
+                          () => Navigator.pushNamed(
+                              context, '/appointment_management'),
+                        ),
+                        _buildActionButton(
+                          context,
+                          'Products',
                           Icons.shopping_bag,
-                          () => Navigator.pushNamed(context, '/product_catalog'),
+                          () =>
+                              Navigator.pushNamed(context, '/product_catalog'),
                         ),
                       ],
                     ),
@@ -221,9 +228,13 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                             firstDay: DateTime.utc(2020, 1, 1),
                             lastDay: DateTime.utc(2030, 12, 31),
                             focusedDay: _focusedDay,
-                            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                            selectedDayPredicate: (day) =>
+                                isSameDay(_selectedDay, day),
                             calendarFormat: _calendarFormat,
-                            eventLoader: (day) => _getAppointmentsForDay(day, allScheduledAppointments),
+                            // Mark every day that has ANY booking (all
+                            // customers) so busy/available days are visible.
+                            eventLoader: (day) =>
+                                _getAppointmentsForDay(day, allAppointments),
                             startingDayOfWeek: StartingDayOfWeek.monday,
                             calendarStyle: const CalendarStyle(
                               markersMaxCount: 3,
@@ -237,7 +248,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                               titleCentered: true,
                               formatButtonShowsNext: false,
                               formatButtonDecoration: BoxDecoration(
-                                border: Border.all(color: AppTheme.primaryGreen),
+                                border:
+                                    Border.all(color: AppTheme.primaryGreen),
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
                             ),
@@ -264,10 +276,29 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                               children: [
                                 Text(
                                   'Appointments for ${_selectedDay != null ? DateFormat('MMMM d, yyyy').format(_selectedDay!) : 'Today'}',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 12),
-                                _buildTimeSlotGrid(context, _selectedDay, allScheduledAppointments, petProvider),
+                                _buildTimeSlotGrid(
+                                  context,
+                                  _selectedDay,
+                                  // Use all appointments to mark occupied slots correctly.
+                                  allAppointments,
+                                  myUid: uid,
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 4,
+                                  children: [
+                                    _legendDot(Colors.green, 'Available'),
+                                    _legendDot(Colors.red, 'Occupied (locked)'),
+                                    _legendDot(Colors.orange, 'Pending'),
+                                    _legendDot(Colors.blue, 'Your booking'),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
@@ -284,15 +315,28 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     );
   }
 
-  Widget _buildTimeSlotGrid(BuildContext context, DateTime? selectedDay, List<Appointment> appointments, PetProvider petProvider) {
+  Widget _buildTimeSlotGrid(
+    BuildContext context,
+    DateTime? selectedDay,
+    List<Appointment> appointments, {
+    required String? myUid,
+  }) {
     final dayAppointments = selectedDay != null
         ? _getAppointmentsForDay(selectedDay, appointments)
         : <Appointment>[];
 
     final timeSlots = [
-      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
-      '4:00 PM', '5:00 PM', '6:00 PM',
+      '8:00 AM',
+      '9:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '12:00 PM',
+      '1:00 PM',
+      '2:00 PM',
+      '3:00 PM',
+      '4:00 PM',
+      '5:00 PM',
+      '6:00 PM',
     ];
 
     final occupiedSlots = <String, Appointment>{};
@@ -318,18 +362,30 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         itemBuilder: (context, index) {
           final slot = timeSlots[index];
           final appointment = occupiedSlots[slot];
-          final isOccupied = appointment != null;
+          // Only pending/confirmed bookings occupy a slot. Finished records
+          // (completed/cancelled/rejected) free the slot up again.
+          final isOccupied = appointment != null &&
+              AppointmentStatus.isActive(appointment.status);
+          final isMine = appointment != null && appointment.ownerUid == myUid;
 
           return InkWell(
-            onTap: () {
-              if (isOccupied) {
-                _showAppointmentDetails(context, appointment, petProvider);
-              }
-            },
+            // Occupied slots are automatically disabled for other customers:
+            // they cannot be opened or interacted with. Own bookings and
+            // free slots remain tappable (own bookings show details).
+            onTap: isOccupied && !isMine
+                ? null
+                : () {
+                    if (isOccupied) {
+                      _showAppointmentDetails(context, appointment,
+                          myUid: myUid);
+                    }
+                  },
+
             child: Container(
               decoration: BoxDecoration(
                 color: isOccupied
-                    ? _getStatusColor(appointment.status).withValues(alpha: 0.15)
+                    ? _getStatusColor(appointment.status)
+                        .withValues(alpha: 0.15)
                     : Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
@@ -347,15 +403,21 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
-                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green.shade700,
+                      color: isOccupied
+                          ? _getStatusColor(appointment.status)
+                          : Colors.green.shade700,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isOccupied ? _getStatusText(appointment.status) : 'Available',
+                    isOccupied
+                        ? _getStatusText(appointment.status)
+                        : 'Available',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isOccupied ? _getStatusColor(appointment.status) : Colors.green,
+                      color: isOccupied
+                          ? _getStatusColor(appointment.status)
+                          : Colors.green,
                     ),
                   ),
                 ],
@@ -364,6 +426,22 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Colors.black54)),
+      ],
     );
   }
 
@@ -392,9 +470,17 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     }
 
     final slots = const <String>[
-      '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
-      '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM',
-      '4:00 PM', '5:00 PM', '6:00 PM',
+      '8:00 AM',
+      '9:00 AM',
+      '10:00 AM',
+      '11:00 AM',
+      '12:00 PM',
+      '1:00 PM',
+      '2:00 PM',
+      '3:00 PM',
+      '4:00 PM',
+      '5:00 PM',
+      '6:00 PM',
     ];
 
     for (final slot in slots) {
@@ -408,7 +494,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     if (hour24 < 8 || hour24 > 18) return null;
     if (hour24 == 12) return '12:00 PM';
     if (hour24 == 0) return '8:00 AM';
-    if (hour24 < 12) return '${hour24}:00 AM';
+    if (hour24 < 12) return '$hour24:00 AM';
     return '${hour24 - 12}:00 PM';
   }
 
@@ -442,13 +528,14 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     }
   }
 
-  void _showAppointmentDetails(BuildContext context, Appointment appointment, PetProvider petProvider) {
-    final firebaseUserProvider = Provider.of<FirebaseUserProvider>(context);
-    final currentUser = firebaseUserProvider.currentUser;
-    final String? uid = currentUser?.uid;
-
+  void _showAppointmentDetails(
+    BuildContext context,
+    Appointment appointment, {
+    required String? myUid,
+  }) {
     // Privacy check: only show details for own appointments
-    final isOwnAppointment = uid != null && appointment.ownerUid == uid;
+    final bool isOwnAppointment =
+        myUid != null && appointment.ownerUid == myUid;
 
     if (!isOwnAppointment) {
       // Show generic occupied message for other customers' appointments
@@ -456,7 +543,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Appointment Slot'),
-          content: const Text('This time slot is occupied by another customer. Appointment details are private.'),
+          content: const Text(
+              'This time slot is occupied by another customer. Appointment details are private.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -468,11 +556,12 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       return;
     }
 
-    final pet = petProvider.pets
-        .where((p) => p.petId == appointment.petId)
-        .isNotEmpty
-        ? petProvider.pets.firstWhere((p) => p.petId == appointment.petId)
-        : null;
+    final petProvider = context.read<PetProvider>();
+
+    final pet =
+        petProvider.pets.where((p) => p.petId == appointment.petId).isNotEmpty
+            ? petProvider.pets.firstWhere((p) => p.petId == appointment.petId)
+            : null;
 
     showDialog(
       context: context,
@@ -484,10 +573,11 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _detailRow('Reason', appointment.reason),
-              _detailRow('Time', appointment.time ?? '-'),
+              _detailRow('Time', appointment.time),
               _detailRow('Status', appointment.status),
               _detailRow('Date', appointment.date),
-              _detailRow('Pet', pet != null ? '${pet.name} (${pet.type})' : 'Unknown'),
+              _detailRow(
+                  'Pet', pet != null ? '${pet.name} (${pet.type})' : 'Unknown'),
             ],
           ),
         ),
@@ -529,40 +619,50 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Card(
       elevation: 2.0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
       ),
-      child: Container(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24.0, color: color),
-            const SizedBox(height: 6.0),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.0),
+        child: Container(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 24.0, color: color),
+              const SizedBox(height: 6.0),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4.0),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
+              const SizedBox(height: 4.0),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -574,36 +674,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     IconData icon,
     VoidCallback onTap,
   ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12.0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12.0),
-          border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppTheme.primaryGreen, size: 28.0),
-            const SizedBox(height: 8.0),
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.primaryGreen,
-                fontSize: 11,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
+    return DashboardActionTile(label: label, icon: icon, onTap: onTap);
   }
 }

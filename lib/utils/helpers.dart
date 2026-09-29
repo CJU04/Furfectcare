@@ -54,7 +54,6 @@ class Formatters {
     return '₱${amount.toStringAsFixed(2)}';
   }
 
-
   static String capitalize(String text) {
     if (text.isEmpty) return text;
     return text[0].toUpperCase() + text.substring(1).toLowerCase();
@@ -62,7 +61,8 @@ class Formatters {
 }
 
 class DialogHelpers {
-  static void showSnackBar(BuildContext context, String message, {bool isError = false}) {
+  static void showSnackBar(BuildContext context, String message,
+      {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -71,7 +71,8 @@ class DialogHelpers {
     );
   }
 
-  static Future<bool> showConfirmationDialog(BuildContext context, String title, String message) async {
+  static Future<bool> showConfirmationDialog(
+      BuildContext context, String title, String message) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -92,4 +93,3 @@ class DialogHelpers {
     return result ?? false;
   }
 }
-

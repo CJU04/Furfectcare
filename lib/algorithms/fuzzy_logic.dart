@@ -1,0 +1,11 @@
+export 'fuzzy_logic/membership_functions.dart';
+export 'fuzzy_logic/fuzzy_input.dart';
+export 'fuzzy_logic/fuzzy_rule.dart';
+export 'fuzzy_logic/fuzzy_result.dart';
+export 'fuzzy_logic/fuzzy_engine.dart';
+export 'fuzzy_logic/veterinary_rules.dart';
+export 'fuzzy_logic/fuzzy_triage.dart';
+export 'fuzzy_logic/fuzzy_medication.dart';
+export 'fuzzy_logic/fuzzy_surgery_risk.dart';
+export 'fuzzy_logic/fuzzy_pain.dart';
+export 'fuzzy_logic/fuzzy_vaccination.dart';

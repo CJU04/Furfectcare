@@ -1,4 +1,9 @@
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/pet.dart';
 import '../models/appointment.dart';
@@ -7,6 +12,9 @@ import '../models/product.dart';
 import '../models/sales.dart';
 import '../models/sale_item.dart';
 import '../models/inventory_log.dart';
+import '../models/user.dart';
+
+import '../models/appointment_log.dart';
 
 /// Firestore-backed service using Firebase Auth UIDs as document IDs.
 ///
@@ -71,7 +79,8 @@ class FirestoreDatabaseService {
   }
 
   Future<List<Pet>> getPetsByOwner(String ownerUid) async {
-    final snap = await _col('pets').where('ownerUid', isEqualTo: ownerUid).get();
+    final snap =
+        await _col('pets').where('ownerUid', isEqualTo: ownerUid).get();
     return snap.docs.map((d) {
       final pet = Pet.fromMap(d.data());
       pet.petId = d.id;
@@ -83,20 +92,15 @@ class FirestoreDatabaseService {
   // Appointment
   // --------------------
   Future<String> insertAppointment(Appointment appointment) async {
-    final data = appointment.toMap();
-
-    if (appointment.appointmentId != null) {
-      await _col('appointments')
-          .doc(appointment.appointmentId)
-          .set(data, SetOptions(merge: true));
-      return appointment.appointmentId!;
-    }
-
-    final docRef = await _col('appointments').add(data);
-
-    // Ensure appointmentId is also persisted so update/edit flows that rely on it work.
-    await docRef.update({'appointmentId': docRef.id});
-    return docRef.id;
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('saveAppointment')
+        .call<Map<String, dynamic>>({
+      'operation': 'create',
+      if (appointment.appointmentId?.isNotEmpty == true)
+        'id': appointment.appointmentId,
+      'appointment': appointment.toMap(),
+    });
+    return result.data['id'] as String;
   }
 
   Future<List<Appointment>> getAppointments() async {
@@ -130,16 +134,21 @@ class FirestoreDatabaseService {
 
   Future<void> updateAppointment(Appointment appointment) async {
     if (appointment.appointmentId == null) {
-      throw ArgumentError('updateAppointment requires appointment.appointmentId');
+      throw ArgumentError(
+          'updateAppointment requires appointment.appointmentId');
     }
-    await _col('appointments').doc(appointment.appointmentId).set(
-          appointment.toMap(),
-          SetOptions(merge: true),
-        );
+    await FirebaseFunctions.instance.httpsCallable('saveAppointment').call({
+      'operation': 'update',
+      'id': appointment.appointmentId,
+      'appointment': appointment.toMap(),
+    });
   }
 
   Future<void> deleteAppointment(String id) async {
-    await _col('appointments').doc(id).delete();
+    await FirebaseFunctions.instance.httpsCallable('saveAppointment').call({
+      'operation': 'delete',
+      'id': id,
+    });
   }
 
   // --------------------
@@ -234,29 +243,41 @@ class FirestoreDatabaseService {
   // --------------------
   Future<String> insertSales(Sales sales) async {
     final data = sales.toMap();
-    if (sales.saleId != null) {
-      await _col('sales').doc(sales.saleId).set(data);
+    if (sales.saleId != null && sales.saleId!.isNotEmpty) {
+      await _col('sales').doc(sales.saleId).set(data, SetOptions(merge: true));
       return sales.saleId!;
     }
     final docRef = await _col('sales').add(data);
+    await docRef.update({'saleId': docRef.id});
     return docRef.id;
   }
 
   Future<List<Sales>> getSales() async {
     final snap = await _col('sales').get();
-    return snap.docs.map((d) => Sales.fromMap(d.data())).toList();
+    return snap.docs.map((d) {
+      final s = Sales.fromMap(d.data());
+      s.saleId = d.id;
+      return s;
+    }).toList();
   }
 
   Future<List<Sales>> getSalesByOwner(String ownerUid) async {
-    final snap = await _col('sales').where('ownerUid', isEqualTo: ownerUid).get();
-    return snap.docs.map((d) => Sales.fromMap(d.data())).toList();
+    final snap =
+        await _col('sales').where('ownerUid', isEqualTo: ownerUid).get();
+    return snap.docs.map((d) {
+      final s = Sales.fromMap(d.data());
+      s.saleId = d.id;
+      return s;
+    }).toList();
   }
 
   Future<void> updateSales(Sales sales) async {
     if (sales.saleId == null) {
       throw ArgumentError('updateSales requires sales.saleId');
     }
-    await _col('sales').doc(sales.saleId).set(sales.toMap(), SetOptions(merge: true));
+    await _col('sales')
+        .doc(sales.saleId)
+        .set(sales.toMap(), SetOptions(merge: true));
   }
 
   Future<void> deleteSales(String id) async {
@@ -282,7 +303,8 @@ class FirestoreDatabaseService {
   }
 
   Future<List<SaleItem>> getSaleItemsBySale(String saleId) async {
-    final snap = await _col('sale_items').where('saleId', isEqualTo: saleId).get();
+    final snap =
+        await _col('sale_items').where('saleId', isEqualTo: saleId).get();
     return snap.docs.map((d) => SaleItem.fromMap(d.data())).toList();
   }
 
@@ -319,7 +341,9 @@ class FirestoreDatabaseService {
   }
 
   Future<List<InventoryLog>> getInventoryLogsByProduct(String productId) async {
-    final snap = await _col('inventory_logs').where('productId', isEqualTo: productId).get();
+    final snap = await _col('inventory_logs')
+        .where('productId', isEqualTo: productId)
+        .get();
     return snap.docs.map((d) => InventoryLog.fromMap(d.data())).toList();
   }
 
@@ -335,5 +359,155 @@ class FirestoreDatabaseService {
 
   Future<void> deleteInventoryLog(String id) async {
     await _col('inventory_logs').doc(id).delete();
+  }
+
+  // --------------------
+  // App Notifications
+  // --------------------
+  Future<String> insertNotification(AppNotification notification) async {
+    final data = notification.toMap();
+    if (notification.notificationId != null &&
+        notification.notificationId!.isNotEmpty) {
+      await _col('notifications')
+          .doc(notification.notificationId)
+          .set(data, SetOptions(merge: true));
+      return notification.notificationId!;
+    }
+    // Pre-allocate the document reference so `notificationId` can be
+    // written in the same create call. A follow-up `update` would be
+    // rejected by `firestore.rules` (recipients may only flip `isRead`).
+    final docRef = _col('notifications').doc();
+    data['notificationId'] = docRef.id;
+    await docRef.set(data);
+    return docRef.id;
+  }
+
+  Stream<List<AppNotification>> watchNotificationsForUser(String userId) {
+    if (userId.isEmpty) return Stream.value(<AppNotification>[]);
+
+    // Primary: real-time snapshots scoped to the caller's own documents.
+    // Fallback: if the listener fails (for example a permission-denied on
+    // legacy rows before rules catch up), degrade gracefully to polling the
+    // one-shot reader so the bell / notification center never disconnects.
+    late final StreamController<List<AppNotification>> controller;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? subscription;
+    Timer? pollTimer;
+
+    Future<void> poll() async {
+      try {
+        final items = await getNotificationsForUser(userId);
+        if (!controller.isClosed) controller.add(items);
+      } catch (e) {
+        debugPrint('Notification polling failed: $e');
+      }
+    }
+
+    controller = StreamController<List<AppNotification>>(
+      onListen: () {
+        subscription = _col('notifications')
+            .where('userId', isEqualTo: userId)
+            .snapshots()
+            .listen(
+          (snapshot) {
+            final items = snapshot.docs
+                .map(
+                    (doc) => AppNotification.fromMap(doc.data(), docId: doc.id))
+                .toList();
+            items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+            if (!controller.isClosed) controller.add(items);
+          },
+          onError: (Object error) {
+            debugPrint('Notification watch failed ($error); '
+                'falling back to polling.');
+            pollTimer ??=
+                Timer.periodic(const Duration(seconds: 10), (_) => poll());
+            poll();
+          },
+        );
+      },
+      onCancel: () {
+        subscription?.cancel();
+        pollTimer?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  Future<List<AppNotification>> getNotificationsForUser(String userId) async {
+    // Primary query uses the `userId` field because `firestore.rules`
+    // validates the `list` operation against `resource.data.userId`.
+    try {
+      final snap =
+          await _col('notifications').where('userId', isEqualTo: userId).get();
+      final list = snap.docs
+          .map((d) => AppNotification.fromMap(d.data(), docId: d.id))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } catch (_) {
+      // Fallback for legacy rows that only stored `recipientUserId`.
+      try {
+        final snap = await _col('notifications')
+            .where('recipientUserId', isEqualTo: userId)
+            .get();
+        final list = snap.docs
+            .map((d) => AppNotification.fromMap(d.data(), docId: d.id))
+            .toList();
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return list;
+      } catch (e) {
+        return [];
+      }
+    }
+  }
+
+  Future<void> markNotificationAsRead(String notificationId) async {
+    await _col('notifications').doc(notificationId).set({
+      'isRead': true,
+      'read': true,
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> markAllNotificationsAsRead(String userId) async {
+    final snap = await _col('notifications')
+        .where('userId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .get();
+    for (final doc in snap.docs) {
+      await doc.reference
+          .set({'isRead': true, 'read': true}, SetOptions(merge: true));
+    }
+  }
+
+  // --------------------
+  // Appointment Logs (audit history)
+  // --------------------
+  Future<String> insertAppointmentLog(AppointmentLog log) async {
+    final data = log.toMap();
+    if (log.logId != null && log.logId!.isNotEmpty) {
+      await _col('appointment_logs').doc(log.logId).set(data);
+      return log.logId!;
+    }
+    // Pre-allocate the document reference so `logId` is written in the same
+    // create call (updates are rejected by `firestore.rules` — history is
+    // immutable).
+    final docRef = _col('appointment_logs').doc();
+    data['logId'] = docRef.id;
+    await docRef.set(data);
+    return docRef.id;
+  }
+
+  Future<List<AppointmentLog>> getAppointmentLogs() async {
+    try {
+      final snap = await _col('appointment_logs').get();
+      final logs = snap.docs
+          .map((d) => AppointmentLog.fromMap(d.data(), docId: d.id))
+          .toList();
+      logs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return logs;
+    } catch (e) {
+      // Non-staff callers (or a rules rollback) must never crash the UI.
+      return [];
+    }
   }
 }

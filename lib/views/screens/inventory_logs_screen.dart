@@ -18,11 +18,21 @@ class InventoryLogsScreen extends StatefulWidget {
 class _InventoryLogsScreenState extends State<InventoryLogsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String _sortBy = 'Newest first';
+
+  static const _sortOptions = <String>[
+    'Newest first',
+    'Oldest first',
+    'Reason (A-Z)',
+    'Quantity (high first)',
+    'Quantity (low first)',
+  ];
 
   @override
   void initState() {
     super.initState();
-    Provider.of<InventoryLogProvider>(context, listen: false).loadInventoryLogs();
+    Provider.of<InventoryLogProvider>(context, listen: false)
+        .loadInventoryLogs();
     Provider.of<ProductProvider>(context, listen: false).loadProducts();
   }
 
@@ -46,8 +56,44 @@ class _InventoryLogsScreenState extends State<InventoryLogsScreen> {
 
     List<InventoryLog> inventoryLogs = inventoryLogsAll;
 
-    if (_searchQuery.isNotEmpty) {
-      inventoryLogs = inventoryLogs.where((log) => log.date.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    String productName(String productId) {
+      for (final p in products) {
+        if (p.productId == productId) return p.productName;
+      }
+      return '';
+    }
+
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.trim().toLowerCase();
+      inventoryLogs = inventoryLogs
+          .where((log) =>
+              log.date.toLowerCase().contains(q) ||
+              log.reason.toLowerCase().contains(q) ||
+              log.quantityChange.toString().contains(q) ||
+              productName(log.productId).toLowerCase().contains(q))
+          .toList();
+    }
+
+    // Copy before sorting so the provider's internal list is never mutated.
+    inventoryLogs = List<InventoryLog>.from(inventoryLogs);
+    switch (_sortBy) {
+      case 'Oldest first':
+        inventoryLogs.sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
+        break;
+      case 'Reason (A-Z)':
+        inventoryLogs.sort(
+            (a, b) => a.reason.toLowerCase().compareTo(b.reason.toLowerCase()));
+        break;
+      case 'Quantity (high first)':
+        inventoryLogs
+            .sort((a, b) => b.quantityChange.compareTo(a.quantityChange));
+        break;
+      case 'Quantity (low first)':
+        inventoryLogs
+            .sort((a, b) => a.quantityChange.compareTo(b.quantityChange));
+        break;
+      default:
+        inventoryLogs.sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
     }
 
     return Scaffold(
@@ -58,9 +104,11 @@ class _InventoryLogsScreenState extends State<InventoryLogsScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            double maxWidth = constraints.maxWidth > 600 ? 800 : double.infinity;
-            double horizontalPadding =
-                constraints.maxWidth > 600 ? (constraints.maxWidth - 800) / 2 : 0;
+            double maxWidth =
+                constraints.maxWidth > 600 ? 800 : double.infinity;
+            double horizontalPadding = constraints.maxWidth > 600
+                ? (constraints.maxWidth - 800) / 2
+                : 0;
 
             return CustomScrollView(
               slivers: [
@@ -69,18 +117,49 @@ class _InventoryLogsScreenState extends State<InventoryLogsScreen> {
                     padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(maxWidth: maxWidth),
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          labelText: 'Search Inventory Logs',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                        },
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                labelText: 'Search Inventory Logs',
+                                hintText:
+                                    'Date, reason, quantity or product name',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: _searchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() => _searchQuery = '');
+                                        },
+                                      )
+                                    : null,
+                                border: const OutlineInputBorder(),
+                              ),
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchQuery = value;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          DropdownButton<String>(
+                            value: _sortBy,
+                            underline: const SizedBox.shrink(),
+                            items: _sortOptions
+                                .map((o) =>
+                                    DropdownMenuItem(value: o, child: Text(o)))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _sortBy = value);
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -93,7 +172,8 @@ class _InventoryLogsScreenState extends State<InventoryLogsScreen> {
                         ),
                       )
                     : SliverPadding(
-                        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: horizontalPadding),
                         sliver: SliverList.builder(
                           itemCount: inventoryLogs.length,
                           itemBuilder: (context, index) {
@@ -143,4 +223,3 @@ class _InventoryLogsScreenState extends State<InventoryLogsScreen> {
     super.dispose();
   }
 }
-

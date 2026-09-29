@@ -1,23 +1,450 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return getUserData().role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'admin';
+    }
+
+    function isVeterinarian() {
+      return isSignedIn() && getUserRole() == 'veterinarian';
+    }
+
+    function isStaff() {
+      return isSignedIn() && getUserRole() == 'staff';
+    }
+
+    function isCustomer() {
+      return isSignedIn() && getUserRole() == 'customer';
+    }
+
+    function isStaffOrAbove() {
+      return isSignedIn() && (getUserRole() == 'staff' || getUserRole() == 'veterinarian' || getUserRole() == 'admin');
+    }
+
+    function isVetOrAdmin() {
+      return isSignedIn() && (getUserRole() == 'veterinarian' || getUserRole() == 'admin');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isApproved() {
+      return isSignedIn() && (getUserData().approved == true || getUserRole() == 'admin' || getUserRole() == 'customer');
+    }
+
+    function getCurrentUid() {
+      return request.auth.uid;
+    }
+
+    // ============================================================
+    // USERS COLLECTION
+    // ============================================================
     match /users/{userId} {
-      allow read: if request.auth != null;
+      // Anyone signed in can read user list (for dropdowns, assignments)
+      allow list: if isSignedIn();
 
-      // Allow creating your own user document on signup
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Users can read their own document
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
 
-      // Prevent clients from setting role: 'admin' themselves.
-      // Only callers with custom claim 'admin' may write role, or the server (admin SDK) may.
-      allow update: if request.auth != null && (
-        // user may update their own profile but must not escalate to admin
-        (request.auth.uid == userId && !(request.resource.data.keys().hasAny(['role']) && request.resource.data.role == 'admin'))
-        // admins (custom claim) may update role
-        || (request.auth.token.admin == true)
+      // Users can create their own profile on signup
+      allow create: if isSignedIn() && isOwner(userId)
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'role', 'contactNumber', 'address', 'createdAt', 'approved', 'imageUrl', 'photoUrl'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role in ['customer', 'staff', 'veterinarian']
+        && (request.resource.data.approved == false || request.resource.data.role == 'customer');
+
+      // Users can update their own profile (except role, approved)
+      allow update: if isSignedIn() && isOwner(userId)
+        && !request.resource.data.keys().hasAny(['role', 'approved', 'uid', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'email', 'contactNumber', 'address', 'imageUrl', 'photoUrl']);
+
+      // Admin can update any user (including role, approved)
+      allow update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'contactNumber', 'address', 'approved', 'imageUrl', 'photoUrl', 'uid', 'createdAt']);
+
+      // No deletes from client
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // PETS COLLECTION
+    // ============================================================
+    match /pets/{petId} {
+      // Owner can read their pets
+      allow get: if isSignedIn() && (
+        resource.data.ownerUid == getCurrentUid() ||
+        isAdmin() ||
+        (isVeterinarian() && existsAppointmentForPet(petId)) ||
+        (isStaff() && existsAppointmentForPet(petId))
       );
 
-      // Deletes allowed only to admins
-      allow delete: if request.auth != null && request.auth.token.admin == true;
+      // List pets - owner sees own, staff/vet/admin see all
+      allow list: if isSignedIn();
+
+      // Owner can create pet
+      allow create: if isSignedIn() && isCustomer()
+        && request.resource.data.ownerUid == getCurrentUid()
+        && request.resource.data.keys().hasOnly(['petId', 'ownerUid', 'name', 'type', 'breed', 'age', 'gender', 'vaccination_status', 'healthnotes', 'createdAt', 'updatedAt']);
+
+      // Staff/Admin can create pet for any owner
+      allow create: if isSignedIn() && (isStaff() || isAdmin())
+        && request.resource.data.keys().hasOnly(['petId', 'ownerUid', 'name', 'type', 'breed', 'age', 'gender', 'vaccination_status', 'healthnotes', 'createdAt', 'updatedAt']);
+
+      // Owner can update their pet
+      allow update: if isSignedIn() && (
+        (isCustomer() && resource.data.ownerUid == getCurrentUid()) ||
+        isAdmin() ||
+        (isVeterinarian() && existsAppointmentForPet(petId)) ||
+        (isStaff() && existsAppointmentForPet(petId))
+      )
+        && !request.resource.data.keys().hasAny(['ownerUid', 'petId', 'createdAt']);
+
+      // Owner can delete their pet, Admin can delete any pet
+      allow delete: if isSignedIn() && (
+        isAdmin() ||
+        (isCustomer() && resource.data.ownerUid == getCurrentUid())
+      );
+    }
+
+    // ============================================================
+    // APPOINTMENTS COLLECTION
+    // ============================================================
+    match /appointments/{appointmentId} {
+      // Owner can read their appointments
+      // Staff/Vet/Admin can read all
+      // Vet can read assigned appointments
+      allow get: if isSignedIn() && (
+        resource.data.ownerUid == getCurrentUid() ||
+        isAdmin() ||
+        isStaff() ||
+        (isVeterinarian() && resource.data.assignedUserId == getCurrentUid())
+      );
+
+      allow list: if isSignedIn();
+
+      // Customer creates appointment (status = pending)
+      allow create: if isSignedIn() && isCustomer()
+        && request.resource.data.ownerUid == getCurrentUid()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.keys().hasOnly(['appointmentId', 'petId', 'ownerUid', 'assignedUserId', 'date', 'time', 'reason', 'status', 'createdAt', 'updatedAt']);
+
+      // Staff/Vet/Admin can create appointment for any owner
+      allow create: if isSignedIn() && (isStaff() || isVeterinarian() || isAdmin())
+        && request.resource.data.keys().hasOnly(['appointmentId', 'petId', 'ownerUid', 'assignedUserId', 'date', 'time', 'reason', 'status', 'createdAt', 'updatedAt']);
+
+      // Customer can cancel their own appointment while it is still
+      // upcoming (pending or confirmed). Only the `status` field may
+      // change, and it must become `cancelled`.
+      allow update: if isSignedIn() && (
+        (isCustomer() && resource.data.ownerUid == getCurrentUid()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status == 'cancelled'
+          && resource.data.status in ['pending', 'confirmed'])
+        ||
+        // Staff/Vet: can change status, assignment and the scheduling
+        // details (date/time/reason) so reschedules are possible, plus the
+        // pet the visit belongs to and the audit timestamp.
+        (isStaffOrAbove()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'assignedUserId', 'date', 'time', 'reason',
+                 'petId', 'updatedAt'])
+          && request.resource.data.status in ['pending', 'confirmed', 'assigned', 'completed', 'cancelled', 'rejected', 'rescheduled', 'no_show']
+          && request.resource.data.ownerUid == resource.data.ownerUid)
+        ||
+        // Admin: full update
+        isAdmin()
+      );
+
+      // Staff/admin may remove a record; a pet owner may remove their own
+      // (the app notifies every affected party before doing so).
+      allow delete: if isSignedIn() && (
+        isAdmin() || isStaff() ||
+        (isCustomer() && resource.data.ownerUid == getCurrentUid())
+      );
+    }
+
+    // ============================================================
+    // MEDICAL HISTORIES COLLECTION
+    // ============================================================
+    match /medical_histories/{historyId} {
+      // Owner can read their pet's medical history
+      // Vet/Staff/Admin can read all
+      allow get: if isSignedIn() && (
+        isAdmin() ||
+        isStaff() ||
+        isVeterinarian() ||
+        (isCustomer() && ownsPet(resource.data.petId))
+      );
+
+      allow list: if isSignedIn();
+
+      // Only Vet/Admin can create medical history
+      allow create: if isSignedIn() && (isVeterinarian() || isAdmin())
+        && request.resource.data.keys().hasOnly(['historyId', 'petId', 'appointmentId', 'date', 'diagnosis', 'treatment', 'notes', 'symptoms', 'medications', 'followUpDate', 'createdAt', 'updatedAt']);
+
+      // Only Vet/Admin can update medical history
+      allow update: if isSignedIn() && (isVeterinarian() || isAdmin())
+        && !request.resource.data.keys().hasAny(['historyId', 'petId', 'appointmentId', 'createdAt']);
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // PRODUCTS COLLECTION
+    // ============================================================
+    match /products/{productId} {
+      // Everyone signed in can read products
+      allow get, list: if isSignedIn();
+
+      // Only Staff/Admin can create products
+      allow create: if isSignedIn() && (isStaff() || isAdmin())
+        && request.resource.data.keys().hasOnly(['productId', 'productName', 'category', 'description', 'price', 'stockQuantity', 'minimumStock', 'unit', 'expirationDate', 'imageUrl', 'status', 'createdAt', 'updatedAt']);
+
+      // Only Staff/Admin can update products
+      allow update: if isSignedIn() && (isStaff() || isAdmin())
+        && !request.resource.data.keys().hasAny(['productId', 'createdAt'])
+        && request.resource.data.price >= 0
+        && request.resource.data.stockQuantity >= 0;
+
+      // Only Admin can delete products
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // SALES COLLECTION
+    // ============================================================
+    match /sales/{saleId} {
+      // Customer can read their sales
+      // Staff/Admin can read all
+      allow get: if isSignedIn() && (
+        resource.data.ownerUid == getCurrentUid() ||
+        isStaff() ||
+        isAdmin()
+      );
+
+      allow list: if isSignedIn();
+
+      // Customer can create their own sale
+      allow create: if isSignedIn() && isCustomer()
+        && request.resource.data.ownerUid == getCurrentUid()
+        && request.resource.data.keys().hasOnly(['saleId', 'ownerUid', 'customerName', 'customerEmail', 'customerContact', 'customerAddress', 'date', 'totalAmount', 'paymentStatus', 'paymentMethod', 'paymentDate', 'orderStatus', 'orderReference', 'paymentReference', 'paymentProofUrl', 'pickupDate', 'orderNotes', 'createdAt', 'updatedAt']);
+
+      // Staff/Admin create sales
+      allow create: if isSignedIn() && (isStaff() || isAdmin())
+        && request.resource.data.keys().hasOnly(['saleId', 'ownerUid', 'customerName', 'customerEmail', 'customerContact', 'customerAddress', 'date', 'totalAmount', 'paymentStatus', 'paymentMethod', 'paymentDate', 'orderStatus', 'orderReference', 'paymentReference', 'paymentProofUrl', 'pickupDate', 'orderNotes', 'createdAt', 'updatedAt']);
+
+      // Staff/Admin update sales
+      allow update: if isSignedIn() && (isStaff() || isAdmin())
+        && !request.resource.data.keys().hasAny(['saleId', 'ownerUid', 'createdAt']);
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // SALE ITEMS COLLECTION
+    // ============================================================
+    match /sale_items/{itemId} {
+      // Staff/Admin can read all
+      // Customer can read items from their sales
+      allow get: if isSignedIn() && (
+        isStaff() ||
+        isAdmin() ||
+        (isCustomer() && belongsToUserSale(resource.data.saleId))
+      );
+
+      allow list: if isSignedIn();
+
+      allow create: if isSignedIn() && (isStaff() || isAdmin())
+        && request.resource.data.keys().hasOnly(['salesItemId', 'saleId', 'productId', 'quantity', 'price', 'subtotal']);
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // INVENTORY LOGS COLLECTION
+    // ============================================================
+    match /inventory_logs/{logId} {
+      // Staff/Admin can read all
+      allow get, list: if isSignedIn() && (isStaff() || isAdmin());
+
+      // Staff/Admin can create logs
+      allow create: if isSignedIn() && (isStaff() || isAdmin())
+        && request.resource.data.keys().hasOnly(['logId', 'productId', 'date', 'quantityChange', 'reason', 'createdAt']);
+
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // NOTIFICATIONS COLLECTION
+    //
+    // Notifications are created client-side by the app whenever an
+    // appointment, order or inventory event happens (see
+    // DatabaseService.insertNotification). Every document stores both
+    // `userId` and `recipientUserId` (same value) so the rules can
+    // validate ownership while the client may query either field.
+    // ============================================================
+    match /notifications/{notificationId} {
+      function notificationKeys() {
+        return ['notificationId', 'userId', 'recipientUserId', 'title',
+          'message', 'type', 'relatedDocumentId', 'isRead', 'read',
+          'createdAt'];
+      }
+
+      function recipient() {
+        return resource.data.userId == getCurrentUid()
+          || resource.data.recipientUserId == getCurrentUid();
+      }
+
+      // Users can read their own notifications.
+      allow get: if isSignedIn() && recipient();
+
+      // Listing must be scoped to the caller's own `userId` field so the
+      // rule engine can prove every returned document belongs to them.
+      allow list: if isSignedIn() && resource.data.userId == getCurrentUid();
+
+      // Legacy documents may only carry `recipientUserId`. Allow listing by
+      // that field too so the fallback query in getNotificationsForUser and
+      // the real-time watch are never blocked by permission-denied.
+      allow list: if isSignedIn() && resource.data.recipientUserId == getCurrentUid();
+
+      // Any signed-in user can raise a notification (the app writes one
+      // per affected party for appointment, order and inventory events),
+      // but the payload must match the expected schema.
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(notificationKeys())
+        && request.resource.data.userId is string
+        && request.resource.data.userId == request.resource.data.recipientUserId
+        && request.resource.data.title is string
+        && request.resource.data.message is string
+        && request.resource.data.type in
+             ['order', 'appointment', 'payment', 'inventory', 'general']
+        && request.resource.data.isRead == false
+        && request.resource.data.read == false;
+
+      // Recipients may only flip the read flag on their own records.
+      allow update: if isSignedIn() && recipient()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['isRead', 'read']);
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // APPOINTMENT LOGS COLLECTION (audit history)
+    //
+    // Every appointment lifecycle activity (created, updated, cancelled,
+    // completed, rejected, deleted, rebooked) is appended here so admins
+    // can review the full history of re-booking activity.
+    // ============================================================
+    match /appointment_logs/{logId} {
+      function logKeys() {
+        return ['logId', 'appointmentId', 'petId', 'ownerUid', 'actorUid',
+          'actorName', 'action', 'details', 'oldStatus', 'newStatus',
+          'appointmentDate', 'appointmentTime', 'createdAt'];
+      }
+
+      // Any signed-in member can append a history record; the payload must
+      // match the expected schema.
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(logKeys())
+        && request.resource.data.appointmentId is string
+        && request.resource.data.action is string
+        && request.resource.data.actorUid is string
+        && request.resource.data.createdAt is string;
+
+      // Clinic-side roles audit every appointment activity; customers may
+      // read history rows that belong to their own bookings.
+      allow get, list: if isSignedIn() && (isStaffOrAbove()
+        || resource.data.ownerUid == getCurrentUid());
+
+      // History is immutable.
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // MEDICAL DOCUMENTS COLLECTION
+    // ============================================================
+    match /medical_documents/{documentId} {
+      function docKeys() {
+        return ['petId', 'appointmentId', 'historyId', 'ownerUid', 'documentType',
+          'fileName', 'fileUrl', 'thumbnailUrl', 'fileSizeBytes', 'mimeType',
+          'uploadedBy', 'uploadedAt', 'expiryDate', 'notes', 'isVerified',
+          'verifiedBy', 'verifiedAt'];
+      }
+
+      function validDocumentType() {
+        return request.resource.data.documentType in
+          ['vaccine_certificate', 'lab_result', 'radiology', 'prescription',
+           'surgery_report', 'dental_record', 'deworming_record', 'fecal_exam',
+           'blood_test', 'urinalysis', 'other', 'appointment_attachment'];
+      }
+
+      // Any signed-in member can browse documents; visibility inside the app
+      // is enforced by role + ownership (staff see all, customers see their
+      // own pets' documents). This keeps single-field petId queries working
+      // without composite indexes.
+      allow get, list: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && (isStaffOrAbove() || request.resource.data.ownerUid == getCurrentUid())
+        && request.resource.data.keys().hasOnly(docKeys())
+        && validDocumentType()
+        && request.resource.data.petId is string
+        && request.resource.data.fileUrl is string
+        && request.resource.data.fileName is string
+        && request.resource.data.fileSizeBytes is number
+        && request.resource.data.fileSizeBytes < 20 * 1024 * 1024;
+
+      // Staff can verify; owners can edit metadata of their own documents.
+      allow update: if isSignedIn()
+        && (
+          (isStaffOrAbove()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['isVerified', 'verifiedBy', 'verifiedAt']))
+          || (resource.data.ownerUid == getCurrentUid()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['documentType', 'appointmentId', 'historyId', 'notes', 'expiryDate']))
+        );
+
+      allow delete: if isSignedIn()
+        && (isStaffOrAbove() || resource.data.ownerUid == getCurrentUid());
+    }
+
+    // ============================================================
+    // HELPER FUNCTIONS FOR RULES
+    // ============================================================
+
+    function existsAppointmentForPet(petId) {
+      return exists(/databases/$(database)/documents/appointments/$(petId));
+    }
+
+    function ownsPet(petId) {
+      return exists(/databases/$(database)/documents/pets/$(petId))
+        && get(/databases/$(database)/documents/pets/$(petId)).data.ownerUid == getCurrentUid();
+    }
+
+    function belongsToUserSale(saleId) {
+      return exists(/databases/$(database)/documents/sales/$(saleId))
+        && get(/databases/$(database)/documents/sales/$(saleId)).data.ownerUid == getCurrentUid();
     }
   }
 }

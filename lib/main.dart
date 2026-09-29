@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 
+import 'config/branding.dart';
 import 'config/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'providers/app_init_provider.dart';
@@ -48,21 +49,46 @@ Future<void> main() async {
   // will still run; full proper web App Check requires configuring it in Firebase Console.
 
   // continue startup
+  // NOTE: AuthProvider and the UI must share ONE FirebaseUserProvider
+  // instance. Previously main.dart created two independent instances
+  // (one for the widget tree, one hidden inside AuthProvider), so
+  // sign-in synced the hidden copy while ProfileAvatar/Drawer watched
+  // the empty one -> avatars stuck on initials / "Guest".
+  final sharedFirebaseUserProvider = FirebaseUserProvider();
+  final sharedNotificationProvider = NotificationProvider();
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppInitProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => FirebaseUserProvider()),
+        // .value does not auto-dispose, so sharing this instance with
+        // AuthProvider below is safe (no double-dispose).
+        ChangeNotifierProvider<FirebaseUserProvider>.value(
+          value: sharedFirebaseUserProvider,
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(
+            firebaseUserProvider: sharedFirebaseUserProvider,
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => PetProvider()),
-        ChangeNotifierProvider(create: (_) => AppointmentProvider()),
+        ChangeNotifierProvider(
+          create: (_) => AppointmentProvider(
+            notificationProvider: sharedNotificationProvider,
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => MedicalHistoryProvider()),
         ChangeNotifierProvider(create: (_) => ProductProvider()),
-        ChangeNotifierProvider(create: (_) => SalesProvider()),
+        ChangeNotifierProvider(
+            create: (_) => SalesProvider(
+                  notificationProvider: sharedNotificationProvider,
+                )),
         ChangeNotifierProvider(create: (_) => SaleItemProvider()),
         ChangeNotifierProvider(create: (_) => InventoryLogProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        // .value ensures the same instance shared above is exposed to the widget tree.
+        ChangeNotifierProvider<NotificationProvider>.value(
+          value: sharedNotificationProvider,
+        ),
       ],
       child: const VetCareConnectApp(),
     ),
@@ -78,7 +104,7 @@ class VetCareConnectApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'VetCare Connect',
+          title: AppBranding.appName,
           theme: AppTheme.light(),
           darkTheme: AppTheme.dark(),
           themeMode: themeProvider.themeMode,
