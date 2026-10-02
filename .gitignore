@@ -39,6 +39,16 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
+# Temporary scratch files and logs
+*.txt
+fix_*.py
+analyze*.py
+update_*.py
+
+# Node dependencies
+functions/node_modules/
+node_modules/
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
