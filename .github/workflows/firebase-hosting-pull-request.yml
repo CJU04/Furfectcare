@@ -13,17 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: Build Flutter web app
-        run: flutter pub get && flutter build web --release
-
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETCARE_CONNECT_D3DAF }}
-          projectId: vetcare-connect-d3daf
+- uses: subosito/flutter-action@v2
+- run: flutter pub get
+- run: flutter build web --release
+- uses: FirebaseExtended/action-hosting-deploy@v0
+  with:
+    repoToken: ${{ secrets.GITHUB_TOKEN }}
+    firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VETCARE_CONNECT_D3DAF }}
+    projectId: vetcare-connect-d3daf
